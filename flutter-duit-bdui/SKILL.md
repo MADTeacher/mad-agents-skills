@@ -373,6 +373,16 @@ await DuitRegistry.registerComponents([
 ]);
 ```
 
+## When to Use This Skill
+
+Use this skill when:
+
+- Integration flutter_duit library into project
+- Custom widet creation
+- Components registration
+- Basic framework behavior overriding via capabilities implementation
+- Need help with the framework API
+
 ## Resources
 
 ### Reference Documentation
@@ -381,3 +391,4 @@ await DuitRegistry.registerComponents([
 - [troubleshooting.md](./references/troubleshooting.md) - Notes about common issues in framework integration
 - [environvent_vars.md](./references//environment_vars.md) — Notes about avalilable env variables and its usage
 - [public_api.md](./references/public_api.md) — Notes about driver public API
+- <https://duit.pro/docs/en> — official documentation site

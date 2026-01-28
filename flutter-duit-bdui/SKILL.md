@@ -378,4 +378,6 @@ await DuitRegistry.registerComponents([
 ### Reference Documentation
 
 - [capabilities.md](./references/capabiliteis.md) — Notes about capability-based design and core framework parts overriding
-- [troubleshooting.md](./references/troubleshhoting.md) - Notes about common issues in framework integration
+- [troubleshooting.md](./references/troubleshooting.md) - Notes about common issues in framework integration
+- [environvent_vars.md](./references//environment_vars.md) — Notes about avalilable env variables and its usage
+- [public_api.md](./references/public_api.md) — Notes about driver public API

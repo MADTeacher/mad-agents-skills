@@ -1,192 +1,194 @@
 # MAD Agents Skills
 
-Коллекция агентских навыков для AI-ассистентов, работающих с Dart и Flutter проектами, реализованная в формате [**Agent Skills**](https://agentskills.io/home) - открытого стандарта для расширения возможностей AI-агентов.
+[Russian version](README.ru.md)
 
-Каждый навык содержит **структурированные знания** на основе официальной документации, готовые примеры кода и подробные справочные материалы, которые могут использовать AI-агенты.
+A collection of agent skills for AI assistants working with Dart and Flutter projects, implemented in the [**Agent Skills**](https://agentskills.io/home) format — an open standard for extending AI agents.
 
-## 📋 Содержание
+Each skill provides **structured knowledge** based on official documentation, ready-to-use code examples, and detailed reference materials that AI agents can leverage.
 
-- [Обзор](#-обзор)
-- [Навыки](#️-навыки)
+## Contents 📋
+
+- [Overview](#overview)
+- [Skills](#skills)
   - [Dart Drift](#dart-drift)
   - [Flutter Adaptive UI](#flutter-adaptive-ui)
   - [Flutter Animations](#flutter-animations)
   - [Flutter Architecture](#flutter-architecture)
-  - [Flutter Drift](#flutter-drift-1)
+  - [Flutter Drift](#flutter-drift)
   - [Flutter Internationalization](#flutter-internationalization)
   - [Flutter Navigation](#flutter-navigation)
   - [Flutter Networking](#flutter-networking)
   - [Flutter Testing](#flutter-testing)
   - [Flutter Backend-driven UI with Duit](#flutter-backend-driven-ui-with-duit)
-- [Файловая структура](#-файловая-структура)
-- [Как использовать](#-как-использовать)
-- [Матрица применения навыков](#-матрица-применения-навыков)
-- [Лицензия](#-лицензия)
-- [Вклад в проект](#-вклад-в-проект)
-- [Дополнительные ресурсы](#-дополнительные-ресурсы)
+- [File structure](#file-structure)
+- [How to use](#how-to-use)
+- [Skills application matrix](#skills-application-matrix)
+- [License](#license)
+- [Contributing](#contributing)
+- [Additional resources](#additional-resources)
 
-## 🎯 Обзор
+## Overview 🎯
 
-Этот репозиторий содержит набор специализированных навыков для разработки на Dart и Flutter, организованных в соответствии с открытым стандартом [**Agent Skills**](https://agentskills.io/home).
+This repository contains a set of specialized skills for Dart and Flutter development, organized according to the open [**Agent Skills**](https://agentskills.io/home) standard.
 
-### Что такое Agent Skills?
+### What are Agent Skills?
 
-Agent Skills - это открытый формат для предоставления AI-агентам новых возможностей и экспертизы. Это структурированные папки с инструкциями, скриптами и ресурсами, которые агенты могут обнаруживать и использовать для выполнения задач более точно и эффективно.
+Agent Skills are an open format for providing AI agents with new capabilities and expertise. They are structured folders with instructions, scripts, and resources that agents can discover and use to complete tasks more accurately and efficiently.
 
-**Формат разработан:** Anthropic  
-**Статус:** Открытый стандарт  
-**Поддержка:** Ведущие AI-инструменты разработки
+**Created by:** Anthropic  
+**Status:** Open standard  
+**Supported by:** Leading AI development tools
 
-### Состав навыка
+### Skill composition
 
-Каждый навык включает:
+Each skill includes:
 
-- **SKILL.md** - описание навыка с метаданными и условиями применения
-- **Справочную документацию** - детальные руководства в папке `references/`
-- **Примеры кода** - готовые шаблоны и примеры в папке `assets/`
-- **Лучшие практики** - рекомендации по использованию
-- **Скрипты** (опционально) - вспомогательные утилиты в папке `scripts/`
+- **SKILL.md** — skill description with metadata and usage conditions
+- **Reference documentation** — detailed guides in `references/`
+- **Code examples** — ready-to-use templates and examples in `assets/`
+- **Best practices** — recommendations and guidelines
+- **Scripts** (optional) — helper utilities in `scripts/`
 
-### Возможности Agent Skills
+### What Agent Skills enable
 
-✨ **Domain expertise** - специализированные знания в конкретных областях  
-🚀 **New capabilities** - новые возможности для агентов  
-🔄 **Repeatable workflows** - стандартизированные рабочие процессы  
-🔗 **Interoperability** - переиспользование между различными AI-инструментами
+✨ **Domain expertise** — specialized knowledge in specific areas  
+🚀 **New capabilities** — new abilities for agents  
+🔄 **Repeatable workflows** — standardized, repeatable workflows  
+🔗 **Interoperability** — reuse across different AI tools
 
-## 🛠️ Навыки
+## Skills 🛠️
 
 ### Dart Drift
 
-**Директория:** `dart-drift/`
+**Directory:** `dart-drift/`
 
-**Описание:** Полное руководство по использованию библиотеки drift для работы с базами данных в Dart приложениях (CLI, серверные приложения, не-Flutter desktop приложения).
+**Description:** A complete guide to using the drift library for working with databases in Dart applications (CLI, server applications, non-Flutter desktop apps).
 
-**Когда использовать:**
+**When to use:**
 
-- Разработка Dart приложений, требующих локальное хранилище SQLite
-- Подключение к PostgreSQL с типобезопасными запросами
-- Необходимость в реактивных потоках данных
-- Реализация миграций схемы БД
-- Создание серверных сервисов с connection pooling
+- Building Dart apps that need a local SQLite store
+- Connecting to PostgreSQL with type-safe queries
+- Reactive data streams
+- Implementing database schema migrations
+- Building server services with connection pooling
 
-**Ключевые возможности:**
+**Key capabilities:**
 
-- Настройка с `sqlite3` или `drift_postgres`
-- Определение таблиц и ограничений
-- SELECT, WHERE, JOIN, агрегации
-- INSERT, UPDATE, DELETE, транзакции
-- Реактивные stream-запросы
-- Миграции схемы базы данных
+- Setup with `sqlite3` or `drift_postgres`
+- Defining tables and constraints
+- SELECT, WHERE, JOIN, aggregations
+- INSERT, UPDATE, DELETE, transactions
+- Reactive stream queries
+- Database schema migrations
 
-**Справочные материалы:**
+**References:**
 
-- `setup.md` - Настройка SQLite и PostgreSQL
-- `postgres.md` - PostgreSQL-специфичные функции
-- `tables.md` - Определение таблиц
-- `queries.md` - Запросы к БД
-- `writes.md` - Операции записи
-- `streams.md` - Реактивные потоки
-- `migrations.md` - Миграции схемы
+- `setup.md` — SQLite & PostgreSQL setup
+- `postgres.md` — PostgreSQL-specific features
+- `tables.md` — Table definitions
+- `queries.md` — Database queries
+- `writes.md` — Write operations
+- `streams.md` — Reactive streams
+- `migrations.md` — Schema migrations
 
 ---
 
 ### Flutter Adaptive UI
 
-**Директория:** `flutter-adaptive-ui/`
+**Directory:** `flutter-adaptive-ui/`
 
-**Описание:** Создание адаптивных и отзывчивых Flutter UI, которые отлично работают на всех платформах и размерах экранов.
+**Description:** Building adaptive and responsive Flutter UIs that work great across platforms and screen sizes.
 
-**Когда использовать:**
+**When to use:**
 
-- Создание приложений для множества платформ (mobile, tablet, desktop, web)
-- Адаптация layouts под разные размеры экранов
-- Поддержка различных устройств ввода (touch, mouse, keyboard)
-- Реализация responsive navigation patterns
-- Оптимизация для больших экранов и складных устройств
-- Использование паттернов Capability и Policy для platform-specific поведения
+- Building apps for multiple platforms (mobile, tablet, desktop, web)
+- Adapting layouts for different screen sizes
+- Supporting different input devices (touch, mouse, keyboard)
+- Implementing responsive navigation patterns
+- Optimizing for large screens and foldables
+- Using Capability and Policy patterns for platform-specific behavior
 
-**Ключевые концепции:**
+**Key concepts:**
 
-- **3-шаговый подход:** Abstract → Measure → Branch
+- **3-step approach:** Abstract → Measure → Branch
 - **Breakpoints:** Compact (<600), Medium (600-840), Expanded (≥840)
-- **Layout правило:** Constraints go down. Sizes go up. Parent sets position.
-- **Capability/Policy паттерн** для платформо-специфичного поведения
+- **Layout rule:** Constraints go down. Sizes go up. Parent sets position.
+- **Capability/Policy pattern** for platform-specific behavior
 
-**Справочные материалы:**
+**References:**
 
-- `layout-constraints.md` - Система constraints с 29 примерами
-- `layout-basics.md` - Основные layout виджеты
-- `layout-common-widgets.md` - Container, GridView, ListView, Stack
-- `adaptive-workflow.md` - Детальный 3-шаговый подход
-- `adaptive-best-practices.md` - Лучшие практики дизайна
-- `adaptive-capabilities.md` - Паттерн Capability/Policy
+- `layout-constraints.md` — Constraints system with 29 examples
+- `layout-basics.md` — Core layout widgets
+- `layout-common-widgets.md` — Container, GridView, ListView, Stack
+- `adaptive-workflow.md` — The 3-step approach in detail
+- `adaptive-best-practices.md` — Design best practices
+- `adaptive-capabilities.md` — Capability/Policy pattern
 
-**Примеры:**
+**Examples:**
 
-- `responsive_navigation.dart` - Переключение NavigationBar ↔ NavigationRail
-- `capability_policy_example.dart` - Примеры классов Capability/Policy
+- `responsive_navigation.dart` — Switching NavigationBar ↔ NavigationRail
+- `capability_policy_example.dart` — Capability/Policy class examples
 
 ---
 
 ### Flutter Animations
 
-**Директория:** `flutter-animations/`
+**Directory:** `flutter-animations/`
 
-**Описание:** Комплексное руководство по реализации анимаций во Flutter.
+**Description:** A comprehensive guide to implementing animations in Flutter.
 
-**Когда использовать:**
+**When to use:**
 
-- Добавление движения и визуальных эффектов в приложение
-- Имплементация implicit animations (простые переходы)
-- Создание explicit animations (полный контроль)
-- Реализация hero animations (shared element transitions)
-- Создание staggered animations (последовательные/перекрывающиеся)
-- Использование physics-based animations
+- Adding motion and visual effects to your app
+- Implementing implicit animations (simple transitions)
+- Building explicit animations (full control)
+- Implementing hero animations (shared element transitions)
+- Creating staggered animations (sequential/overlapping)
+- Using physics-based animations
 
-**Типы анимаций:**
+**Animation types:**
 
-**Implicit Animations** - для простых случаев:
+**Implicit Animations** — for simple cases:
 
 - AnimatedContainer, AnimatedOpacity
 - TweenAnimationBuilder
-- Анимация триггерится изменением состояния
+- Animations are triggered by state changes
 
-**Explicit Animations** - для полного контроля:
+**Explicit Animations** — for full control:
 
 - AnimationController, Tween, CurvedAnimation
 - AnimatedWidget, AnimatedBuilder
-- Мониторинг состояния анимации
-- Множественные одновременные анимации
+- Monitoring animation state
+- Multiple simultaneous animations
 
-**Hero Animations** - shared element transitions:
+**Hero Animations** — shared element transitions:
 
-- Стандартные hero transitions
+- Standard hero transitions
 - Radial hero animations
-- Навигация между экранами
+- Navigation between screens
 
-**Staggered Animations** - последовательные эффекты:
+**Staggered Animations** — sequential effects:
 
 - Interval-based timing
 - Ripple effects
-- Меню с последовательным появлением
+- Menus with sequential appearance
 
-**Physics-Based** - естественные движения:
+**Physics-Based** — natural motion:
 
 - Spring simulations
 - Fling animations
-- Gravity-based анимации
+- Gravity-based animations
 
-**Справочные материалы:**
+**References:**
 
-- `implicit.md` - Implicit анимации
-- `explicit.md` - Explicit анимации с AnimationController
-- `hero.md` - Hero transitions
-- `staggered.md` - Staggered паттерны
-- `physics.md` - Physics-based анимации
-- `curves.md` - Справочник по Curves
+- `implicit.md` — Implicit animations
+- `explicit.md` — Explicit animations with AnimationController
+- `hero.md` — Hero transitions
+- `staggered.md` — Staggered patterns
+- `physics.md` — Physics-based animations
+- `curves.md` — Curves reference
 
-**Шаблоны:**
+**Templates:**
 
 - `implicit_animation.dart`
 - `explicit_animation.dart`
@@ -197,336 +199,336 @@ Agent Skills - это открытый формат для предоставл�
 
 ### Flutter Architecture
 
-**Директория:** `flutter-architecture/`
+**Directory:** `flutter-architecture/`
 
-**Описание:** Комплексное руководство по архитектуре Flutter приложений с использованием MVVM паттерна и feature-first организации.
+**Description:** A comprehensive guide to Flutter app architecture using the MVVM pattern and feature-first organization.
 
-**Когда использовать:**
+**When to use:**
 
-- Проектирование или рефакторинг архитектуры Flutter приложения
-- Выбор между feature-first и layer-first структурой проекта
-- Реализация MVVM паттерна во Flutter
-- Создание масштабируемой структуры для команд
-- Добавление новых функций к существующей архитектуре
-- Применение лучших практик и паттернов проектирования
+- Designing or refactoring a Flutter app architecture
+- Choosing between feature-first and layer-first project structures
+- Implementing MVVM in Flutter
+- Building a scalable structure for teams
+- Adding new features to an existing architecture
+- Applying best practices and design patterns
 
-**Организация проекта:**
+**Project organization:**
 
-**Feature-First (рекомендуется для команд):**
+**Feature-First (recommended for teams):**
 
-- Организация по бизнес-функциям
-- Средние и большие приложения (10+ функций)
-- Командная разработка (2+ разработчика)
-- Самодостаточные feature-модули
+- Organized by business capabilities
+- Medium and large apps (10+ features)
+- Team development (2+ developers)
+- Self-contained feature modules
 
-**Layer-First (традиционный):**
+**Layer-First (traditional):**
 
-- Организация по архитектурным слоям
-- Малые и средние приложения
-- Соло-разработчики или малые команды
-- Простая бизнес-логика
+- Organized by architectural layers
+- Small and medium apps
+- Solo developers or small teams
+- Simple business logic
 
-**Архитектурные слои:**
+**Architectural layers:**
 
-- **UI Layer:** Views (widgets) и ViewModels (UI логика)
-- **Data Layer:** Repositories (SSOT) и Services (источники данных)
-- **Domain Layer:** Use-cases для сложной бизнес-логики (опционально)
+- **UI Layer:** Views (widgets) and ViewModels (UI logic)
+- **Data Layer:** Repositories (SSOT) and Services (data sources)
+- **Domain Layer:** Use cases for complex business logic (optional)
 
-**Паттерны проектирования:**
+**Design patterns:**
 
-- Command Pattern - инкапсуляция действий
-- Result Type - типобезопасная обработка ошибок
-- Repository Pattern - абстракция над источниками данных
-- Offline-First - оптимистичные UI обновления
+- Command Pattern — action encapsulation
+- Result Type — type-safe error handling
+- Repository Pattern — abstraction over data sources
+- Offline-First — optimistic UI updates
 
-**Справочные материалы:**
+**References:**
 
-- `concepts.md` - Основные принципы архитектуры
-- `feature-first.md` - Feature-first организация
-- `mvvm.md` - Реализация MVVM паттерна
-- `layers.md` - Слои и их взаимодействие
-- `design-patterns.md` - Общие паттерны
+- `concepts.md` — Core architecture principles
+- `feature-first.md` — Feature-first organization
+- `mvvm.md` — MVVM implementation
+- `layers.md` — Layers and their interactions
+- `design-patterns.md` — Common patterns
 
-**Примеры:**
+**Examples:**
 
-- `command.dart` - Шаблон Command паттерна
-- `result.dart` - Result type для обработки ошибок
-- `examples/` - Примеры применения архитектуры
+- `command.dart` — Command pattern template
+- `result.dart` — Result type for error handling
+- `examples/` — Architecture usage examples
 
 ---
 
 ### Flutter Drift
 
-**Директория:** `flutter-drift/`
+**Directory:** `flutter-drift/`
 
-**Описание:** Полное руководство по использованию библиотеки drift для локального хранилища в Flutter приложениях.
+**Description:** A complete guide to using the drift library for local storage in Flutter apps.
 
-**Когда использовать:**
+**When to use:**
 
-- Создание Flutter приложений с локальной SQLite базой данных
-- Необходимость типобезопасных запросов
-- Реализация реактивных stream-запросов
-- Миграции схемы базы данных
-- Эффективные CRUD операции
-- Кроссплатформенная поддержка (mobile, web, desktop)
+- Building Flutter apps with a local SQLite database
+- Needing type-safe queries
+- Implementing reactive stream queries
+- Database schema migrations
+- Efficient CRUD operations
+- Cross-platform support (mobile, web, desktop)
 
-**Ключевые возможности:**
+**Key capabilities:**
 
-- Настройка с `drift_flutter` пакетом
-- Интеграция StreamBuilder для реактивного UI
-- Паттерны Provider/Riverpod
-- Platform-specific настройка (mobile, web)
-- In-memory database для тестирования
-- Миграции схемы с версионированием
+- Setup with the `drift_flutter` package
+- StreamBuilder integration for reactive UI
+- Provider/Riverpod patterns
+- Platform-specific setup (mobile, web)
+- In-memory database for testing
+- Versioned schema migrations
 
-**Справочные материалы:**
+**References:**
 
-- `setup.md` - Flutter-специфичная настройка
-- `tables.md` - Определение таблиц
-- `queries.md` - SELECT запросы
-- `writes.md` - INSERT, UPDATE, DELETE
-- `streams.md` - Реактивные потоки
-- `migrations.md` - Миграции БД
-- `flutter-ui.md` - Интеграция с Flutter UI
+- `setup.md` — Flutter-specific setup
+- `tables.md` — Table definitions
+- `queries.md` — SELECT queries
+- `writes.md` — INSERT, UPDATE, DELETE
+- `streams.md` — Reactive streams
+- `migrations.md` — Database migrations
+- `flutter-ui.md` — Flutter UI integration
 
 ---
 
 ### Flutter Internationalization
 
-**Директория:** `flutter-internationalization/`
+**Directory:** `flutter-internationalization/`
 
-**Описание:** Полное руководство по интернационализации Flutter приложений с использованием gen-l10n и intl пакетов.
+**Description:** A complete guide to internationalizing Flutter apps using gen-l10n and intl.
 
-**Когда использовать:**
+**When to use:**
 
-- Добавление поддержки локализации в Flutter приложение
-- Перевод UI текста на множество языков
-- Форматирование чисел и дат для разных локалей
-- Настройка мультиязычной поддержки для Material/Cupertino
-- Реализация RTL (right-to-left) языков
-- Управление ARB файлами и переводами
+- Adding localization support to a Flutter app
+- Translating UI text into multiple languages
+- Formatting numbers and dates for different locales
+- Configuring multilingual support for Material/Cupertino
+- Implementing RTL (right-to-left) languages
+- Managing ARB files and translations
 
-**Подходы:**
+**Approaches:**
 
-**gen-l10n (рекомендуется):**
+**gen-l10n (recommended):**
 
-- Современный, автоматизированный подход
-- ARB файлы + кодогенерация
-- Лучше для новых проектов и команд
+- Modern, automated approach
+- ARB files + code generation
+- Best for new projects and teams
 
 **intl package:**
 
-- Ручной контроль
-- Code-based переводы
-- Для простых или legacy проектов
+- Manual control
+- Code-based translations
+- For simple or legacy projects
 
 **Custom/Manual:**
 
-- Максимальная гибкость
+- Maximum flexibility
 - Map-based lookup
-- Очень простые приложения
+- Very simple apps
 
-**Типы сообщений:**
+**Message types:**
 
-- Простые сообщения
-- С placeholders (параметры)
-- Plural messages (множественное число)
-- Select messages (выбор по значению)
-- Форматирование чисел и дат
+- Simple messages
+- With placeholders (parameters)
+- Plural messages
+- Select messages
+- Number and date formatting
 
-**Справочные материалы:**
+**References:**
 
-- `l10n-config.md` - Конфигурация l10n.yaml
-- `arb-format.md` - Формат ARB файлов
-- `number-date-formats.md` - Форматирование чисел и дат
+- `l10n-config.md` — l10n.yaml configuration
+- `arb-format.md` — ARB file format
+- `number-date-formats.md` — Number and date formatting
 
-**Примеры:**
+**Examples:**
 
-- `app_en.arb` - Пример ARB файла
-- `l10n.yaml` - Конфигурационный файл
+- `app_en.arb` — Example ARB file
+- `l10n.yaml` — Configuration file
 
 ---
 
 ### Flutter Navigation
 
-**Директория:** `flutter-navigation/`
+**Directory:** `flutter-navigation/`
 
-**Описание:** Комплексное руководство по навигации и роутингу во Flutter, включая Navigator API, go_router, deep linking и web-навигацию.
+**Description:** A comprehensive guide to navigation and routing in Flutter, including Navigator API, go_router, deep linking, and web navigation.
 
-**Когда использовать:**
+**When to use:**
 
-- Реализация переходов между экранами
-- Настройка системы роутинга
-- Настройка deep links (iOS, Android, Web)
-- Обработка browser history
-- Управление navigation state
-- Передача и возврат данных между экранами
+- Implementing screen-to-screen navigation
+- Configuring routing
+- Setting up deep links (iOS, Android, Web)
+- Handling browser history
+- Managing navigation state
+- Passing and returning data between screens
 
-**Выбор подхода:**
+**Choosing an approach:**
 
-**Navigator API (императивный):**
+**Navigator API (imperative):**
 
-- Простые приложения без deep linking
-- Базовые навигационные стеки
-- Быстрое прототипирование
-- Переходы single-screen → multi-screen
+- Simple apps without deep linking
+- Basic navigation stacks
+- Rapid prototyping
+- Moving from single-screen → multi-screen
 
-**go_router (декларативный, рекомендуется):**
+**go_router (declarative, recommended):**
 
-- Приложения с deep linking
-- Web приложения с browser history
-- Сложные навигационные паттерны
-- URL-based навигация
-- Production приложения
+- Apps with deep linking
+- Web apps with browser history
+- Complex navigation patterns
+- URL-based navigation
+- Production apps
 
-**Избегать Named Routes:**
+**Avoid Named Routes:**
 
-- Flutter team НЕ рекомендует
-- Ограничения в кастомизации deep links
-- Нет поддержки browser forward button
+- Not recommended by the Flutter team
+- Limitations in deep-link customization
+- No support for the browser forward button
 
-**Общие задачи:**
+**Common tasks:**
 
-- Передача данных между экранами
-- Возврат данных с экранов
-- Настройка deep linking (Android, iOS, Web)
+- Passing data between screens
+- Returning data from screens
+- Deep linking setup (Android, iOS, Web)
 - Web URL strategy (hash vs path)
 - Route guards (authentication)
 - Nested routes
 - Error handling (404)
 
-**Справочные материалы:**
+**References:**
 
-- `navigation-patterns.md` - Сравнение подходов
-- `go_router-guide.md` - Детальное руководство по go_router
-- `deep-linking.md` - Настройка deep links
-- `web-navigation.md` - Web-специфичная навигация
+- `navigation-patterns.md` — Approach comparison
+- `go_router-guide.md` — Detailed go_router guide
+- `deep-linking.md` — Deep link setup
+- `web-navigation.md` — Web-specific navigation
 
-**Примеры:**
+**Examples:**
 
-- `navigator_basic.dart` - Базовый Navigator
-- `go_router_basic.dart` - Базовый go_router
-- `passing_data.dart` - Передача данных
-- `returning_data.dart` - Возврат данных
+- `navigator_basic.dart` — Basic Navigator
+- `go_router_basic.dart` — Basic go_router
+- `passing_data.dart` — Passing data
+- `returning_data.dart` — Returning data
 
 ---
 
 ### Flutter Networking
 
-**Директория:** `flutter-networking/`
+**Directory:** `flutter-networking/`
 
-**Описание:** Комплексное руководство по сетевым операциям во Flutter, включая HTTP, WebSocket, аутентификацию и обработку ошибок.
+**Description:** A comprehensive guide to networking in Flutter, including HTTP, WebSocket, authentication, and error handling.
 
-**Когда использовать:**
+**When to use:**
 
-- Реализация HTTP запросов (GET, POST, PUT, DELETE)
-- WebSocket соединения для real-time коммуникации
-- Аутентифицированные запросы с headers и tokens
-- Background parsing с isolates
-- REST API интеграция
-- Обработка сетевых ошибок
-- Оптимизация производительности сетевых операций
+- Implementing HTTP requests (GET, POST, PUT, DELETE)
+- WebSocket connections for real-time communication
+- Authenticated requests with headers and tokens
+- Background parsing with isolates
+- REST API integration
+- Handling network errors
+- Optimizing networking performance
 
-**HTTP методы:**
+**HTTP methods:**
 
-- **GET** - получение данных
-- **POST** - создание ресурсов
-- **PUT** - обновление ресурсов
-- **DELETE** - удаление ресурсов
+- **GET** — fetch data
+- **POST** — create resources
+- **PUT** — update resources
+- **DELETE** — delete resources
 
 **WebSocket:**
 
-- Соединения с `web_socket_channel`
-- Stream-based обмен сообщениями
-- Real-time коммуникация
+- Connections with `web_socket_channel`
+- Stream-based messaging
+- Real-time communication
 
-**Аутентификация:**
+**Authentication:**
 
 - Bearer Token
 - Basic Auth
 - API Key
 - Custom headers
 
-**Обработка ошибок:**
+**Error handling:**
 
 - HTTP status codes
 - Network exceptions
 - Timeout handling
-- Retry logic с exponential backoff
+- Retry logic with exponential backoff
 
-**Производительность:**
+**Performance:**
 
-- Background parsing с `compute()`
-- Caching стратегии
+- Background parsing with `compute()`
+- Caching strategies
 - Connection pooling
 - Request throttling
 
-**Архитектурные паттерны:**
+**Architecture patterns:**
 
 - Service Layer (HTTP endpoints)
 - Repository Layer (caching, aggregation)
 - ViewModel Layer (UI transformation)
 
-**Справочные материалы:**
+**References:**
 
-- `http-basics.md` - HTTP CRUD операции
-- `websockets.md` - WebSocket реализация
-- `authentication.md` - Стратегии аутентификации
-- `error-handling.md` - Паттерны обработки ошибок
-- `performance.md` - Оптимизация
+- `http-basics.md` — HTTP CRUD operations
+- `websockets.md` — WebSocket implementation
+- `authentication.md` — Authentication strategies
+- `error-handling.md` — Error handling patterns
+- `performance.md` — Optimization
 
-**Примеры:**
+**Examples:**
 
-- `fetch_example.dart` - GET запрос с FutureBuilder
-- `post_example.dart` - POST запрос
-- `websocket_example.dart` - WebSocket клиент
-- `auth_example.dart` - Аутентифицированный запрос
-- `background_parsing.dart` - compute() для JSON
+- `fetch_example.dart` — GET request with FutureBuilder
+- `post_example.dart` — POST request
+- `websocket_example.dart` — WebSocket client
+- `auth_example.dart` — Authenticated request
+- `background_parsing.dart` — `compute()` for JSON
 
-**Шаблоны:**
+**Templates:**
 
-- `http_service.dart` - HTTP service шаблон
-- `repository_template.dart` - Repository паттерн
+- `http_service.dart` — HTTP service template
+- `repository_template.dart` — Repository pattern template
 
 ---
 
 ### Flutter Testing
 
-**Директория:** `flutter-testing/`
+**Directory:** `flutter-testing/`
 
-**Описание:** Комплексное руководство по тестированию Flutter приложений: unit, widget и integration тесты.
+**Description:** A comprehensive guide to testing Flutter apps: unit, widget, and integration tests.
 
-**Когда использовать:**
+**When to use:**
 
-- Написание unit тестов для функций/методов/классов
-- Создание widget тестов для проверки UI компонентов
-- Разработка integration тестов для end-to-end тестирования
-- Мокирование зависимостей и plugin взаимодействий
-- Отладка частых ошибок тестирования
-- Тестирование Flutter plugins с native кодом
-- Запуск тестов в разных build modes
+- Writing unit tests for functions/methods/classes
+- Creating widget tests to validate UI components
+- Building integration tests for end-to-end coverage
+- Mocking dependencies and plugin interactions
+- Debugging common testing issues
+- Testing Flutter plugins with native code
+- Running tests in different build modes
 
-**Типы тестов:**
+**Test types:**
 
 **Unit Tests:**
 
-- Тестирование отдельных функций/классов
-- Мокирование внешних зависимостей
-- Избегание disk I/O и UI rendering
-- Быстрое выполнение, высокая maintainability
+- Testing individual functions/classes
+- Mocking external dependencies
+- Avoiding disk I/O and UI rendering
+- Fast execution, high maintainability
 
 **Widget Tests:**
 
-- Тестирование UI виджетов
-- Проверка пользовательских взаимодействий
-- Тестирование разных ориентаций
-- Валидация изменений состояния
+- Testing UI widgets
+- Verifying user interactions
+- Testing different orientations
+- Validating state changes
 
 **Integration Tests:**
 
-- Тестирование полных user flows
-- Проверка множества экранов/страниц
-- Тестирование навигации
+- Testing full user flows
+- Covering multiple screens/pages
+- Testing navigation
 - Performance profiling
 
 **Trade-offs:**
@@ -537,157 +539,158 @@ Agent Skills - это открытый формат для предоставл�
 | Maintenance cost | Low    | Higher | Highest     |
 | Execution speed  | Quick  | Quick  | Slow        |
 
-**Работа с Plugins:**
+**Working with plugins:**
 
-- Мокирование platform channels
-- Тестирование app кода с plugins
-- Тестирование самих plugins
-- Native code тестирование
+- Mocking platform channels
+- Testing app code that depends on plugins
+- Testing plugins themselves
+- Native code testing
 
-**Частые ошибки:**
+**Common issues:**
 
 - RenderFlex overflow
 - Unbounded height/width
 - setState during build
-- Plugin crashes в тестах
+- Plugin crashes in tests
 
 **Build Modes:**
 
-- **Debug** - разработка с hot reload
-- **Profile** - анализ производительности
-- **Release** - deployment (assertions disabled)
+- **Debug** — development with hot reload
+- **Profile** — performance analysis
+- **Release** — deployment (assertions disabled)
 
-**Лучшие практики:**
+**Best practices:**
 
-- Test Pyramid (больше unit/widget, меньше integration)
+- Test Pyramid (more unit/widget, fewer integration)
 - Descriptive test names
-- Arrange-Act-Assert структура
+- Arrange–Act–Assert structure
 - Test independence
 - Mock external dependencies
-- CI автоматизация
+- CI automation
 
-**Справочные материалы:**
+**References:**
 
-- `unit-testing.md` - Unit тесты и mocking
-- `widget-testing.md` - Widget finding и взаимодействия
-- `integration-testing.md` - End-to-end тестирование
-- `mocking.md` - Мокирование зависимостей
-- `common-errors.md` - Решения частых ошибок
-- `plugin-testing.md` - Тестирование plugins
+- `unit-testing.md` — Unit tests and mocking
+- `widget-testing.md` — Widget finding and interactions
+- `integration-testing.md` — End-to-end testing
+- `mocking.md` — Dependency mocking
+- `common-errors.md` — Fixes for common issues
+- `plugin-testing.md` — Plugin testing
 
 ---
 
 ### Flutter Backend-driven UI with Duit
 
-**Директория:** `flutter-duit-bdui/`
+**Directory:** `flutter-duit-bdui/`
 
-**Описание:** Комплексное руководство по интеграции BDUI-фреймворка [flutter_duit](https://pub.dev/packages/flutter_duit) в Flutter приложения.
+**Description:** A comprehensive guide to integrating the BDUI framework [flutter_duit](https://pub.dev/packages/flutter_duit) into Flutter apps.
 
-**Когда использовать:**
+**When to use:**
 
-- Интеграция flutter_duit в проект
-- Создание и регистрация кастомных виджетов
-- Регистрация компонентов
-- Переопределения базовой функциональности фреймворка путем реализации capabilities
-- Нужна справочная информацию по публичному API фреймворка
+- Integrating flutter_duit into a project
+- Creating and registering custom widgets
+- Registering components
+- Overriding core framework behavior by implementing capabilities
+- Needing reference information about the framework’s public API
 
-**Справочные материалы**
+**References:**
 
-- [capabilities.md](./flutter-duit-bdui/references/capabiliteis.md) — Примечания к проектированию на основе capability и переопределению основных частей фреймворка.
-- [troubleshooting.md](./flutter-duit-bdui/references/troubleshooting.md) - Примечания о распространенных проблемах интеграции фреймворков
-- [environvent_vars.md](./flutter-duit-bdui/references//environment_vars.md) — Примечания о доступных переменных окружения и их использовании.
-- [public_api.md](./flutter-duit-bdui/references/public_api.md) — Примечания к публисному API драйвера
-- <https://duit.pro/docs/en> — Официальный сайт с документацией
+- [capabilities.md](./flutter-duit-bdui/references/capabiliteis.md) — Notes on capability-based design and overriding core framework parts.
+- [troubleshooting.md](./flutter-duit-bdui/references/troubleshooting.md) — Notes on common framework integration issues.
+- [environvent_vars.md](./flutter-duit-bdui/references//environment_vars.md) — Notes on available environment variables and how to use them.
+- [public_api.md](./flutter-duit-bdui/references/public_api.md) — Notes on the driver’s public API.
+- <https://duit.pro/docs/en> — Official documentation website
 
-## 📁 Файловая структура
+## File structure 📁
 
-Каждый навык организован следующим образом:
+Each skill is organized as follows:
 
 ```
 skill-name/
-├── SKILL.md              # Основное описание навыка
-├── references/           # Справочная документация
+├── SKILL.md              # Main skill description
+├── references/           # Reference documentation
 │   ├── topic1.md
 │   ├── topic2.md
 │   └── ...
-├── assets/              # Примеры кода и шаблоны
+├── assets/              # Code examples and templates
 │   ├── examples/
 │   ├── templates/
 │   └── ...
-└── scripts/            # Вспомогательные скрипты (опционально)
+└── scripts/            # Helper scripts (optional)
 ```
 
-## 🚀 Как использовать
+## How to use 🚀
 
-Этот репозиторий следует открытому формату [Agent Skills](https://agentskills.io/home) - стандарту для предоставления AI-агентам новых возможностей и экспертизы. Agent Skills - это папки с инструкциями, скриптами и ресурсами, которые агенты могут обнаруживать и использовать для выполнения задач более точно и эффективно.
+This repository follows the open [Agent Skills](https://agentskills.io/home) format — a standard for giving AI agents new capabilities and expertise. Agent Skills are folders with instructions, scripts, and resources that agents can discover and use to complete tasks more accurately and efficiently.
 
-### Совместимость
+### Compatibility
 
-Навыки из этого репозитория могут использоваться любыми AI-ассистентами, поддерживающими формат Agent Skills, включая:
+Skills from this repository can be used by any AI assistants that support the Agent Skills format, including:
 
-- Anthropic Claude (с поддержкой Agent Skills)
+- Anthropic Claude (with Agent Skills support)
 - Cursor IDE
-- Другие совместимые инструменты разработки
+- Other compatible development tools
 
-### Преимущества Agent Skills
+### Benefits of Agent Skills
 
-**Для разработчиков навыков:**
+**For skill authors:**
 
-- Создайте навык один раз, используйте в множестве AI-инструментов
-- Version control через Git
-- Портативность между проектами и командами
+- Create a skill once and use it across many AI tools
+- Version control with Git
+- Portability across projects and teams
 
-**Для команд и организаций:**
+**For teams and organizations:**
 
-- Захват организационных знаний в структурированном формате
-- Стандартизация подходов к разработке
-- Переиспользование лучших практик
+- Capturing organizational knowledge in a structured format
+- Standardizing development approaches
+- Reusing best practices
 
-**Для AI-агентов:**
+**For AI agents:**
 
-- Расширяемая база знаний без переобучения
-- Контекстно-зависимая экспертиза
-- Повторяемые рабочие процессы
+- An extendable knowledge base without retraining
+- Context-dependent expertise
+- Repeatable workflows
 
-## 📊 Матрица применения навыков
+## Skills application matrix 📊
 
-| Задача | Навык | Когда использовать |
+| Task | Skill | When to use |
 |--------|-------|-------------------|
-| Локальная БД (Dart) | dart-drift | CLI, server-side, non-Flutter desktop |
-| Локальная БД (Flutter) | flutter-drift | Flutter приложения, mobile/web/desktop |
-| Адаптивный UI | flutter-adaptive-ui | Multi-platform, responsive layouts |
-| Анимации | flutter-animations | Motion effects, transitions |
-| Архитектура проекта | flutter-architecture | MVVM, feature-first, scalable structure |
-| Мультиязычность | flutter-internationalization | Localization, translations, i18n |
-| Навигация | flutter-navigation | Routing, deep linking, screen transitions |
-| Сетевые запросы | flutter-networking | HTTP, WebSocket, REST API |
-| Тестирование | flutter-testing | Unit, widget, integration tests |
+| Local DB (Dart) | dart-drift | CLI, server-side, non-Flutter desktop |
+| Local DB (Flutter) | flutter-drift | Flutter apps, mobile/web/desktop |
+| Adaptive UI | flutter-adaptive-ui | Multi-platform, responsive layouts |
+| Animations | flutter-animations | Motion effects, transitions |
+| Project architecture | flutter-architecture | MVVM, feature-first, scalable structure |
+| Internationalization | flutter-internationalization | Localization, translations, i18n |
+| Navigation | flutter-navigation | Routing, deep linking, screen transitions |
+| Backend-driven UI (BDUI) | flutter-duit-bdui | DUIT, server-driven UI, backend-driven screens |
+| Networking | flutter-networking | HTTP, WebSocket, REST API |
+| Testing | flutter-testing | Unit, widget, integration tests |
 
-## 📝 Лицензия
+## License 📝
 
-Этот проект лицензирован под MIT License - см. файл [LICENSE](LICENSE) для деталей.
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
 
-## 🤝 Вклад в проект
+## Contributing 🤝
 
-Вклад в развитие навыков приветствуется! Пожалуйста:
+Contributions are welcome! Please:
 
-- Следуйте [спецификации Agent Skills](https://agentskills.io/specification)
-- Следуйте существующей структуре навыков в репозитории
-- Добавляйте практические примеры в `assets/`
-- Документируйте условия применения в `SKILL.md`
-- Включайте best practices и справочные материалы в `references/`
-- Используйте метаданные в frontmatter файлов `SKILL.md`
+- Follow the [Agent Skills specification](https://agentskills.io/specification)
+- Follow the existing skill structure in the repository
+- Add practical examples to `assets/`
+- Document usage conditions in `SKILL.md`
+- Include best practices and reference materials in `references/`
+- Use metadata in the `SKILL.md` frontmatter
 
-## 📚 Дополнительные ресурсы
+## Additional resources 📚
 
 ### Agent Skills
 
-- [Agent Skills - Официальный сайт](https://agentskills.io/home)
-- [Спецификация формата Agent Skills](https://agentskills.io/specification)
-- [Интеграция Agent Skills](https://agentskills.io/integrate-skills)
-- [Agent Skills на GitHub](https://github.com/agentskills/agentskills)
+- [Agent Skills — Official website](https://agentskills.io/home)
+- [Agent Skills format specification](https://agentskills.io/specification)
+- [Agent Skills integration](https://agentskills.io/integrate-skills)
+- [Agent Skills on GitHub](https://github.com/agentskills/agentskills)
 
 ---
 
-**Версия:** 1.0  
-**Последнее обновление:** Январь 2026
+**Version:** 1.0  
+**Last updated:** January 2026

@@ -1,6 +1,9 @@
 ---
 name: flutter-drift
 description: Complete guide for using drift database library in Flutter applications. Use when building Flutter apps that need local SQLite database storage with type-safe queries, reactive streams, migrations, and efficient CRUD operations. Includes setup with drift_flutter package, StreamBuilder integration, Provider/Riverpod patterns, and Flutter-specific database management for mobile, web, and desktop platforms.
+metadata:
+  author: Stanislav [MADTeacher] Chernyshev
+  version: "1.0"
 ---
 
 # Flutter Drift

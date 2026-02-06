@@ -1,6 +1,9 @@
 ---
 name: dart-drift
 description: Complete guide for using drift database library in Dart applications (CLI, server-side, non-Flutter). Use when building Dart apps that need local SQLite database storage or PostgreSQL connection with type-safe queries, reactive streams, migrations, and efficient CRUD operations. Includes setup with sqlite3 package, PostgreSQL support with drift_postgres, connection pooling, and server-side patterns.
+metadata:
+  author: Stanislav [MADTeacher] Chernyshev
+  version: "1.0"
 ---
 
 # Dart Drift

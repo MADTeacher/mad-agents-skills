@@ -1,6 +1,9 @@
 ---
 name: flutter-networking
 description: Comprehensive Flutter networking guidance including HTTP CRUD operations, WebSocket connections, authentication, error handling, and performance optimization. Use when Claude needs to implement HTTP requests GET POST PUT DELETE, WebSocket real-time communication, authenticated requests with headers and tokens, background parsing with isolates, REST API integration with proper error handling, or any network-related functionality in Flutter applications.
+metadata:
+  author: Stanislav [MADTeacher] Chernyshev
+  version: "1.0"
 ---
 
 # Flutter Networking

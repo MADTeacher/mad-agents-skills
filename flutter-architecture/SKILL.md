@@ -1,6 +1,9 @@
 ---
 name: flutter-architecture
 description: Comprehensive guide for architecting Flutter applications following MVVM pattern and best practices with feature-first project organization. Use when working with Flutter projects to structure code properly, implement clean architecture layers (UI, Data, Domain), apply recommended design patterns, and organize projects using feature-first approach for scalable, maintainable apps.
+metadata:
+  author: Stanislav [MADTeacher] Chernyshev
+  version: "1.0"
 ---
 
 # Flutter Architecture

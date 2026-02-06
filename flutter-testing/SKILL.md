@@ -1,6 +1,9 @@
 ---
 name: flutter-testing
 description: Comprehensive Flutter testing guidance covering unit tests, widget tests, and integration tests. Use when working with Flutter applications to write unit tests for functions/methods/classes, create widget tests to verify UI components, develop integration tests for end-to-end testing, mock dependencies and plugin interactions, debug common testing errors, test Flutter plugins with native code, and run tests in different build modes (debug, profile, release)
+metadata:
+  author: Stanislav [MADTeacher] Chernyshev
+  version: "1.0"
 ---
 
 # Flutter Testing

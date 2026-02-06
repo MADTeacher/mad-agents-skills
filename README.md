@@ -10,6 +10,7 @@ Each skill provides **structured knowledge** based on official documentation, re
 
 - [Overview](#overview)
 - [Skills](#skills)
+  - [AGENTS.md Generator](#agents-md-generator)
   - [Dart Drift](#dart-drift)
   - [Flutter Adaptive UI](#flutter-adaptive-ui)
   - [Flutter Animations](#flutter-animations)
@@ -57,6 +58,40 @@ Each skill includes:
 🔗 **Interoperability** — reuse across different AI tools
 
 ## Skills 🛠️
+
+### AGENTS.md Generator
+
+**Directory:** `agents-md-generator/`
+
+**Description:** Create or update minimal AGENTS.md files in the repository root and nested module directories using progressive disclosure. Works across heterogeneous projects without assuming any fixed agent folder structure.
+
+**When to use:**
+
+- AGENTS.md is missing, bloated, contradictory, or outdated
+- A new package/service/module appears
+- Repository structure changes (monorepo growth or split)
+- Teams want consistent agent context across diverse stacks
+
+**Key capabilities:**
+
+- Discover repository shape (git root, language/tool markers)
+- Detect module boundaries (build manifests, deployable units)
+- Generate root AGENTS.md (≤60 lines): purpose, toolchain, commands, docs links
+- Generate nested AGENTS.md (≤40 lines): module purpose, local commands
+- Progressive disclosure: keep AGENTS.md concise, link to docs/skills
+- Adaptive skill referencing (local or external)
+
+**Output:**
+
+- `<repo_root>/AGENTS.md`
+- `<module_dir>/AGENTS.md` (for independent packages/services)
+
+**References:**
+
+- `AGENTS_TEMPLATE_ROOT.md` — Root AGENTS.md template
+- `AGENTS_TEMPLATE_MODULE.md` — Nested module template
+
+---
 
 ### Dart Drift
 
@@ -655,6 +690,7 @@ Skills from this repository can be used by any AI assistants that support the Ag
 
 | Task | Skill | When to use |
 |--------|-------|-------------------|
+| AGENTS.md / repository context | agents-md-generator | Creating/updating AGENTS.md, monorepo structure |
 | Local DB (Dart) | dart-drift | CLI, server-side, non-Flutter desktop |
 | Local DB (Flutter) | flutter-drift | Flutter apps, mobile/web/desktop |
 | Adaptive UI | flutter-adaptive-ui | Multi-platform, responsive layouts |

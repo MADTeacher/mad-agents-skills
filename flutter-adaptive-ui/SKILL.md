@@ -1,6 +1,9 @@
 ---
 name: flutter-adaptive-ui
 description: Build adaptive and responsive Flutter UIs that work beautifully across all platforms and screen sizes. Use when creating Flutter apps that need to adapt layouts based on screen size, support multiple platforms including mobile tablet desktop and web, handle different input devices like touch mouse and keyboard, implement responsive navigation patterns, optimize for large screens and foldables, or use Capability and Policy patterns for platform-specific behavior.
+metadata:
+  author: Stanislav [MADTeacher] Chernyshev
+  version: "1.0"
 ---
 
 # Flutter Adaptive UI

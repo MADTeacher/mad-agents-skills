@@ -1,6 +1,9 @@
 ---
 name: flutter-navigation
 description: Comprehensive guide for Flutter navigation and routing including Navigator API, go_router, deep linking, passing/returning data, and web-specific navigation. Use when implementing screen transitions, configuring routing systems, setting up deep links, handling browser history, or managing navigation state in Flutter applications.
+metadata:
+  author: Stanislav [MADTeacher] Chernyshev
+  version: "1.0"
 ---
 
 # Flutter Navigation

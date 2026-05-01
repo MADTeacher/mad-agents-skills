@@ -114,6 +114,10 @@ Messages that change based on a string value:
 }
 ```
 
+Select matching is case-sensitive. For example, `Male` does not match `male`
+and falls back to `other`, so normalize values before passing them to generated
+localization methods.
+
 ## Placeholder Types
 
 ### String
@@ -170,7 +174,8 @@ Messages that change based on a string value:
 
 ## Number Format Options
 
-See [number-formats.md](number-formats.md) for complete list of format options.
+See [number-date-formats.md](number-date-formats.md) for the complete list of
+number and date format options.
 
 ## Date Format Options
 

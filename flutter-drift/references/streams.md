@@ -1,84 +1,94 @@
 ---
 title: Stream Queries
-description: Watch queries in drift
+description: Use Drift reactive query streams in Flutter
 ---
 
-## Basic Stream
+## Basic Streams
 
-Watch query results:
+Every runnable Drift select can become a stream.
 
 ```dart
-final todosStream = select(todoItems).watch();
+final todosStream = database.select(database.todoItems).watch();
 ```
 
-Use with StreamBuilder in Flutter:
+Flutter can consume the stream with `StreamBuilder`:
 
 ```dart
 StreamBuilder<List<TodoItem>>(
-  stream: select(todoItems).watch(),
+  stream: database.select(database.todoItems).watch(),
   builder: (context, snapshot) {
-    if (!snapshot.hasData) {
-      return CircularProgressIndicator();
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator());
     }
 
-    final todos = snapshot.data!;
+    if (snapshot.hasError) {
+      return Text('Error: ${snapshot.error}');
+    }
+
+    final todos = snapshot.data ?? [];
     return ListView.builder(
       itemCount: todos.length,
       itemBuilder: (context, index) {
-        return ListTile(
-          title: Text(todos[index].title),
-        );
+        return ListTile(title: Text(todos[index].title));
       },
     );
   },
 )
 ```
 
-## Stream Single Item
+Drift streams emit an up-to-date value after listening. You usually do not need to call `get()` before `watch()`.
 
-Watch single row:
+## Single Row Streams
 
-```dart
-final todoStream = (select(todoItems)
-  ..where((t) => t.id.equals(1))
-  .watchSingle();
-```
-
-Or allow null:
+Use `watchSingle()` only when exactly one row must exist:
 
 ```dart
-final todoStream = (select(todoItems)
-  ..where((t) => t.id.equals(1))
-  .watchSingleOrNull();
+final todoStream = (database.select(database.todoItems)
+      ..where((t) => t.id.equals(id)))
+    .watchSingle();
 ```
 
-## Get vs Watch
-
-Run once vs watch continuously:
+Use `watchSingleOrNull()` when the row may not exist:
 
 ```dart
-// Run once, get current results
-final todos = await select(todoItems).get();
-
-// Watch for changes, get updates
-final todosStream = select(todoItems).watch();
+final todoStream = (database.select(database.todoItems)
+      ..where((t) => t.id.equals(id)))
+    .watchSingleOrNull();
 ```
 
-## StreamBuilder Usage
+## Filtered Streams
 
-Complete StreamBuilder example:
+```dart
+final activeTodos = (database.select(database.todoItems)
+      ..where((t) => t.isCompleted.equals(false)))
+    .watch();
+```
+
+```dart
+final sortedTodos = (database.select(database.todoItems)
+      ..orderBy([
+        (t) => OrderingTerm.desc(t.createdAt),
+      ]))
+    .watch();
+```
+
+## StreamBuilder With State
 
 ```dart
 class TodoList extends StatelessWidget {
+  const TodoList({required this.database, super.key});
+
+  final AppDatabase database;
+
   @override
   Widget build(BuildContext context) {
-    final database = Provider.of<AppDatabase>(context);
-
     return StreamBuilder<List<TodoItem>>(
-      stream: select(todoItems).watch(),
+      stream: (database.select(database.todoItems)
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .watch(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return CircularProgressIndicator();
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
@@ -86,29 +96,26 @@ class TodoList extends StatelessWidget {
         }
 
         final todos = snapshot.data ?? [];
-
         if (todos.isEmpty) {
-          return Center(child: Text('No todos yet'));
+          return const Center(child: Text('No todos yet'));
         }
 
         return ListView.builder(
           itemCount: todos.length,
           itemBuilder: (context, index) {
             final todo = todos[index];
-            return ListTile(
+            return CheckboxListTile(
+              value: todo.isCompleted,
               title: Text(todo.title),
-              trailing: Checkbox(
-                value: todo.isCompleted,
-                onChanged: (value) {
-                  database.update(todoItems).replace(
-                    TodoItem(
-                      id: todo.id,
-                      title: todo.title,
-                      isCompleted: value ?? false,
-                    ),
-                  );
-                },
-              ),
+              onChanged: (value) {
+                (database.update(database.todoItems)
+                      ..where((t) => t.id.equals(todo.id)))
+                    .write(
+                  TodoItemsCompanion(
+                    isCompleted: Value(value ?? false),
+                  ),
+                );
+              },
             );
           },
         );
@@ -118,198 +125,152 @@ class TodoList extends StatelessWidget {
 }
 ```
 
-## Riverpod Integration
+## Riverpod StreamProvider
 
-Wrap stream with StreamProvider:
+Do not treat `AsyncValue<List<TodoItem>>` as a list. Use `when`.
 
 ```dart
-final todosProvider = StreamProvider.autoDispose<List<TodoItem>>((ref) {
-  final database = ref.watch(databaseProvider);
-  return select(database.todoItems).watch();
+final databaseProvider = Provider<AppDatabase>((ref) {
+  final database = AppDatabase();
+  ref.onDispose(database.close);
+  return database;
 });
-```
 
-Use in widget:
+final todosProvider = StreamProvider<List<TodoItem>>((ref) {
+  final database = ref.watch(databaseProvider);
+  return (database.select(database.todoItems)
+        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      .watch();
+});
 
-```dart
 class TodoList extends ConsumerWidget {
+  const TodoList({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final todos = ref.watch(todosProvider);
+    final todosAsync = ref.watch(todosProvider);
 
-    return ListView.builder(
-      itemCount: todos.length,
-      itemBuilder: (context, index) {
-        return ListTile(title: Text(todos[index].title));
-      },
+    return todosAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) => Text('Error: $error'),
+      data: (todos) => ListView.builder(
+        itemCount: todos.length,
+        itemBuilder: (context, index) {
+          return ListTile(title: Text(todos[index].title));
+        },
+      ),
     );
   }
 }
 ```
 
-## Watch Filtered Results
-
-Watch filtered query:
+## Join Streams
 
 ```dart
-final activeTodos = (select(todoItems)
-  ..where((t) => !t.isCompleted)
-  .watch();
-```
+class TodoWithCategory {
+  TodoWithCategory({required this.todo, required this.category});
 
-Watch sorted results:
-
-```dart
-final sortedTodos = (select(todoItems)
-  ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
-  .watch();
-```
-
-## Watch with Joins
-
-Watch joined query results:
-
-```dart
-class EntryWithCategory {
-  EntryWithCategory(this.entry, this.category);
-  final TodoItem entry;
-  final Category? category;
+  final TodoItem todo;
+  final TodoCategory? category;
 }
 
-final todosWithCategoryStream = (select(todoItems)
-  .join([
-      leftOuterJoin(categories, categories.id.equalsExp(todoItems.category)),
-    ])
-  .map((row) => EntryWithCategory(
-        row.readTable(todoItems),
-        row.readTableOrNull(categories),
-      ))
-  .watch();
+Stream<List<TodoWithCategory>> watchTodosWithCategory(AppDatabase database) {
+  final query = database.select(database.todoItems).join([
+    leftOuterJoin(
+      database.categories,
+      database.categories.id.equalsExp(database.todoItems.category),
+    ),
+  ]);
+
+  return query
+      .map(
+        (row) => TodoWithCategory(
+          todo: row.readTable(database.todoItems),
+          category: row.readTableOrNull(database.categories),
+        ),
+      )
+      .watch();
+}
 ```
 
 ## Custom Query Streams
 
-Watch custom SQL query:
+For custom SQL, use `customSelect(...).watch()` and always declare `readsFrom` so Drift knows which tables invalidate the stream.
 
 ```dart
-Stream<List<TodoItem>> watchCompletedTodos() {
-  return watch('''
-    SELECT * FROM todo_items
-    WHERE is_completed = ?
-    ORDER BY created_at DESC
-  ''', [true]);
+Stream<List<TodoItem>> watchCompletedTodos(AppDatabase database) {
+  return database
+      .customSelect(
+        '''
+        SELECT * FROM todo_items
+        WHERE is_completed = ?
+        ORDER BY created_at DESC
+        ''',
+        variables: [Variable.withBool(true)],
+        readsFrom: {database.todoItems},
+      )
+      .watch()
+      .map(
+        (rows) => rows
+            .map((row) => database.todoItems.map(row.data))
+            .toList(),
+      );
 }
 ```
 
 ## Table Update Events
 
-Listen to table updates directly:
+Use `tableUpdates` for low-level update events:
 
 ```dart
-final todoUpdates = todoUpdates(todoItems).listen((event) {
-  switch (event.kind) {
-    case UpdateKind.insert:
-      print('New todo inserted: ${event.row}');
-    case UpdateKind.update:
-      print('Todo updated: ${event.row}');
-    case UpdateKind.delete:
-      print('Todo deleted');
+final subscription = database
+    .tableUpdates(
+      TableUpdateQuery.onTable(
+        database.todoItems,
+        limitUpdateKind: UpdateKind.update,
+      ),
+    )
+    .listen((updates) {
+  for (final update in updates) {
+    debugPrint('Todo table update: $update');
   }
 });
 ```
 
+Cancel subscriptions you create manually:
+
+```dart
+await subscription.cancel();
+```
+
 ## Manual Update Trigger
 
-Trigger stream updates manually:
+If a write happens outside Drift and streams must refresh, manually notify the affected table:
 
 ```dart
-void triggerUpdates() {
-  notifyTableUpdates(todoItems);
-}
+database.notifyUpdates({
+  TableUpdate.onTable(
+    database.todoItems,
+    kind: UpdateKind.update,
+  ),
+});
 ```
 
-## Stream Cancellation
+## Stream Transformations
 
-Cancel stream subscription:
+Map streams to lightweight UI state when widgets do not need full rows:
 
 ```dart
-StreamSubscription? subscription;
-
-void startWatching() {
-  subscription = select(todoItems).watch().listen((todos) {
-    print('Updated todos: $todos');
-  });
-}
-
-void stopWatching() {
-  subscription?.cancel();
-  subscription = null;
-}
+final titlesStream = database
+    .select(database.todoItems)
+    .watch()
+    .map((todos) => todos.map((todo) => todo.title).toList());
 ```
 
-## Stream Debouncing
-
-Debounce rapid updates:
-
-```dart
-import 'dart:async';
-
-Stream<List<TodoItem>> watchDebouncedTodos() {
-  return select(todoItems).watch().debounceTime(
-    const Duration(milliseconds: 300),
-  );
-}
-```
-
-## Stream Transformation
-
-Transform stream data:
-
-```dart
-final todoTitles = select(todoItems)
-  .watch()
-  .map((todos) => todos.map((t) => t.title).toList());
-
-final activeCount = (select(todoItems)
-  ..where((t) => !t.isCompleted)
-  .watch()
-  .map((todos) => todos.length);
-```
-
-## Stream Error Handling
-
-Handle stream errors:
-
-```dart
-select(todoItems).watch().listen(
-  (todos) {
-    // Handle new data
-    updateUI(todos);
-  },
-  onError: (error, stack) {
-    // Handle errors
-    showError(error);
-  },
-  onDone: () {
-    // Stream closed
-    print('Stream closed');
-  },
-);
-```
+Debounce user input before rebuilding the query in UI state. Do not depend on a `debounceTime` extension unless the app already imports a package that provides it.
 
 ## Limitations
 
-Streams have these limitations:
-
-1. **External changes**: Updates made outside of drift APIs don't trigger stream updates
-2. **Coarse updates**: Streams update for any change to watched tables, not just relevant rows
-3. **Performance**: Stream queries should be efficient (few rows, fast execution)
-
-## Best Practices
-
-- Use streams for UI-reactive data (lists, counters)
-- Prefer `watch()` over repeated `get()` calls
-- Keep stream queries efficient (limit rows, use indexes)
-- Cancel stream subscriptions when not needed
-- Use `watchSingle()` for single-item queries
-- Filter and map streams as needed for UI requirements
+- Updates outside Drift do not trigger query streams unless you call `notifyUpdates`.
+- Drift stream invalidation is table-based, so streams can rerun more often than the exact row changes require.
+- Keep stream queries indexed and reasonably small for UI use.

@@ -67,6 +67,8 @@ Responsibility: Interact with user, display data, receive input.
 - Use ChangeNotifier for simple apps
 - Consider Provider, Riverpod, or Bloc for complex apps
 - Expose state as Streams or ChangeNotifiers
+- Call Repositories directly for simple flows; introduce Use-cases only when
+  business logic is complex, reused, or spans multiple Repositories.
 
 ## Domain Layer (Optional)
 
@@ -87,7 +89,8 @@ Add when ViewModels have logic that:
 **Relationships:**
 - Use-cases depend on Repositories
 - Use-cases and Repositories: many-to-many
-- ViewModels depend on Use-cases AND Repositories (can skip use-cases for simple logic)
+- ViewModels may depend on Use-cases for complex operations and on Repositories
+  directly for simple operations.
 
 **Pros:**
 - Avoid code duplication in ViewModels
@@ -156,11 +159,15 @@ Responsibility: Handle business data and logic.
 
 ## Layer Communication Rules
 
-1. **Adjacent layers only**: UI ↔ Domain ↔ Data
-2. **Unidirectional data flow**: Data → ViewModel → View
-3. **Events flow opposite**: View → ViewModel → Repository → Service
-4. **No skipping layers**: Views don't call Services directly
-5. **Dependencies**: Lower layers don't depend on upper layers
+1. **Lower layers stay independent**: Data doesn't depend on Domain or UI;
+   Domain doesn't depend on UI.
+2. **Unidirectional data flow**: Data -> ViewModel -> View.
+3. **Events flow opposite**: View -> ViewModel -> Repository -> Service, or
+   View -> ViewModel -> Use-case -> Repository -> Service when a Use-case is
+   justified.
+4. **No direct service calls from UI**: Views and ViewModels don't call
+   Services directly.
+5. **No forced Domain layer**: Skipping Use-cases is valid for simple logic.
 
 ## When to Use Which Layer
 

@@ -1,84 +1,101 @@
 ---
 title: Table Definitions
-description: Define database tables in drift
+description: Define Drift tables for Dart SQLite and PostgreSQL apps
 ---
 
-## Basic Table Structure
+# Table Definitions
 
-All tables in drift extend the `Table` class and define columns as `late final` fields:
+Use this reference for table classes, constraints, indexes, defaults, and
+backend-specific column choices.
+
+## Basic Table
 
 ```dart
 class TodoItems extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get title => text()();
-  DateTimeColumn get createdAt => dateTime().nullable()();
+  TextColumn get title => text().withLength(min: 1, max: 200)();
+  TextColumn get content => text().nullable()();
+  BoolColumn get isCompleted => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 ```
 
-## Adding Tables to Database
-
-Add tables to your database using the `@DriftDatabase` annotation:
+Register tables on the database:
 
 ```dart
 @DriftDatabase(tables: [TodoItems, Categories])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase(QueryExecutor e) : super(e);
+  AppDatabase(super.executor);
 
   @override
   int get schemaVersion => 1;
 }
 ```
 
-## Column Types
+## Common Column Types
 
-| Dart Type | Drift Column | SQL Type |
-|------------|---------------|-----------|
-| `int` | `integer()` | `INTEGER` |
-| `BigInt` | `int64()` | `INTEGER` |
-| `String` | `text()` | `TEXT` |
-| `bool` | `boolean()` | `INTEGER` (1 or 0) |
-| `double` | `real()` | `REAL` |
-| `Uint8List` | `blob()` | `BLOB` |
-| `DateTime` | `dateTime()` | `INTEGER` or `TEXT` |
+| Dart type | Drift column | Notes |
+|---|---|---|
+| `int` | `integer()` | SQLite integer |
+| `BigInt` | `int64()` | 64-bit integer |
+| `String` | `text()` | Text |
+| `bool` | `boolean()` | Stored as integer in SQLite |
+| `double` | `real()` | Floating point |
+| `Uint8List` | `blob()` | Binary data |
+| `DateTime` | `dateTime()` | Good for SQLite; avoid for PostgreSQL-specific schemas |
 
-## Nullable Columns
-
-Use `nullable()` to allow `null` values:
+Use `nullable()` to allow null values:
 
 ```dart
-late final category = integer().nullable()();
+IntColumn get categoryId => integer().nullable()();
 ```
 
-## Default Values
+## Defaults
 
-### Server Default (SQL)
+SQLite server-side default:
 
 ```dart
-late final createdAt = dateTime().withDefault(currentDateAndTime)();
+DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 ```
 
-### Client Default (Dart)
+Dart-side default:
 
 ```dart
-late final isActive = boolean().clientDefault(() => true)();
+BoolColumn get isActive => boolean().clientDefault(() => true)();
 ```
 
-## Foreign Keys
+For PostgreSQL timestamps, prefer `PgTypes` and `now()` from
+`drift_postgres` instead of SQLite-oriented `dateTime()` helpers.
 
-Reference another table:
+## Keys and Constraints
+
+Auto-increment primary key:
+
+```dart
+IntColumn get id => integer().autoIncrement()();
+```
+
+Custom primary key:
+
+```dart
+class Profiles extends Table {
+  TextColumn get email => text()();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {email};
+}
+```
+
+Foreign key:
 
 ```dart
 class Albums extends Table {
-  late final artist = integer().references(Artists, #id)();
-}
-
-class Artists extends Table {
-  late final id = integer().autoIncrement()();
-  late final name = text()();
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get artistId => integer().references(Artists, #id)();
 }
 ```
 
-Enable foreign keys:
+Enable SQLite foreign keys when opening the database:
 
 ```dart
 @override
@@ -91,183 +108,108 @@ MigrationStrategy get migration {
 }
 ```
 
-## Auto Increment Primary Key
+Unique constraints:
 
 ```dart
-class Items extends Table {
-  late final id = integer().autoIncrement()();
-  late final title = text()();
-}
+TextColumn get username => text().unique()();
 ```
-
-Inserting with auto increment:
-
-```dart
-await database.items.insertAll([
-  ItemsCompanion.insert(title: 'First entry'),
-  ItemsCompanion.insert(title: 'Another item'),
-]);
-```
-
-## Custom Primary Key
-
-```dart
-class Profiles extends Table {
-  late final email = text()();
-
-  @override
-  Set<Column<Object>> get primaryKey => {email};
-}
-```
-
-## Unique Columns
-
-Single column unique:
-
-```dart
-late final username = text().unique()();
-```
-
-Multiple columns unique:
 
 ```dart
 class Reservations extends Table {
-  late final room = text()();
-  late final onDay = dateTime()();
+  TextColumn get room => text()();
+  DateTimeColumn get onDay => dateTime()();
 
   @override
-  List<Set<Column>> get uniqueKeys => [
-    {room, onDay},
-  ];
+  List<Set<Column<Object>>>? get uniqueKeys => [
+        {room, onDay},
+      ];
 }
+```
+
+Check constraint:
+
+```dart
+IntColumn get age => integer().check(age.isBiggerOrEqualValue(0))();
 ```
 
 ## Indexes
 
-Simple index:
-
 ```dart
-@TableIndex(name: 'user_name', columns: {#name})
+@TableIndex(name: 'users_by_name', columns: {#name})
 class Users extends Table {
-  late final id = integer().autoIncrement()();
-  late final name = text()();
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
 }
 ```
-
-Index with ordering:
 
 ```dart
 @TableIndex(
-  name: 'log_entries_at',
+  name: 'log_entries_by_time',
   columns: {IndexedColumn(#loggedAt, orderBy: OrderingMode.desc)},
 )
 class LogEntries extends Table {
-  late final loggedAt = dateTime()();
+  IntColumn get id => integer().autoIncrement()();
+  DateTimeColumn get loggedAt => dateTime()();
 }
 ```
 
-Custom SQL index:
+Partial or expression indexes can use SQL:
 
 ```dart
 @TableIndex.sql('''
   CREATE INDEX pending_orders ON orders (creation_time)
-    WHERE status == 'pending';
+    WHERE status = 'pending';
 ''')
 class Orders extends Table {
-  late final status = text()();
-  late final creationTime = dateTime()();
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get status => text()();
+  DateTimeColumn get creationTime => dateTime()();
 }
 ```
 
-## Table Mixins
+## PostgreSQL Types
 
-Extract common columns:
-
-```dart
-mixin TableMixin on Table {
-  late final id = integer().autoIncrement()();
-  late final createdAt = dateTime().withDefault(currentDateAndTime)();
-}
-
-class Posts extends Table with TableMixin {
-  late final content = text()();
-}
-```
-
-## Custom Table Name
+Import `drift_postgres` for Postgres-specific custom types:
 
 ```dart
-class Products extends Table {
+import 'package:drift_postgres/drift_postgres.dart';
+
+class Users extends Table {
+  UuidColumn get id => customType(PgTypes.uuid).withDefault(genRandomUuid())();
+  TextColumn get name => text()();
+  JsonColumn get settings => customType(PgTypes.jsonb)();
+  TimestampColumn get createdAt =>
+      customType(PgTypes.timestampWithTimezone).withDefault(now())();
+
   @override
-  String get tableName => 'product_table';
+  Set<Column<Object>>? get primaryKey => {id};
 }
 ```
 
-## Custom Column Name
-
-```dart
-late final isAdmin = boolean().named('admin')();
-```
-
-## Length Constraints
-
-```dart
-late final name = text().withLength(min: 1, max: 50)();
-```
-
-## Check Constraints
-
-```dart
-late final Column<int> age = integer().check(age.isBiggerOrEqualValue(0))();
-```
+Useful `PgTypes` include `uuid`, `json`, `jsonb`, `textArray`, `date`,
+`timestampWithTimezone`, and `timestampNoTimezone`.
 
 ## Generated Columns
 
-Virtual (computed on read):
-
-```dart
-class Squares extends Table {
-  late final length = integer()();
-  late final width = integer()();
-  late final area = integer().generatedAs(length * width)();
-}
-```
-
-Stored (computed on write):
-
 ```dart
 class Boxes extends Table {
-  late final length = integer()();
-  late final width = integer()();
-  late final area = integer().generatedAs(length * width, stored: true)();
+  IntColumn get length => integer()();
+  IntColumn get width => integer()();
+  IntColumn get area => integer().generatedAs(length * width, stored: true)();
 }
 ```
 
-## Custom Table Constraints
+## Naming
+
+Custom table name:
 
 ```dart
-class TableWithCustomConstraints extends Table {
-  late final foo = integer()();
-  late final bar = integer()();
-
-  @override
-  List<String> get customConstraints => [
-    'FOREIGN KEY (foo, bar) REFERENCES group_memberships ("group", user)',
-  ];
-}
+@override
+String get tableName => 'product_table';
 ```
 
-## Strict Tables
+Custom column name:
 
 ```dart
-class Preferences extends Table {
-  late final key = text()();
-  late final value = sqliteAny().nullable()();
-
-  @override
-  Set<Column<Object>>? get primaryKey => {key};
-
-  @override
-  bool get isStrict => true;
-}
+BoolColumn get isAdmin => boolean().named('admin')();
 ```

@@ -27,12 +27,12 @@ class StaggeredAnimationApp extends StatelessWidget {
 
 /// Staggered animation with fade, scale, and color changes
 class StaggeredAnimation extends StatelessWidget {
-  const StaggeredAnimation({super.key, required this.controller});
+  StaggeredAnimation({super.key, required this.animation});
 
   late final Animation<double> opacity = Tween<double>(begin: 0.0, end: 1.0)
       .animate(
         CurvedAnimation(
-          parent: controller,
+          parent: animation,
           curve: const Interval(0.0, 0.1, curve: Curves.ease),
         ),
       );
@@ -40,7 +40,7 @@ class StaggeredAnimation extends StatelessWidget {
   late final Animation<double> width = Tween<double>(begin: 50.0, end: 150.0)
       .animate(
         CurvedAnimation(
-          parent: controller,
+          parent: animation,
           curve: const Interval(0.125, 0.25, curve: Curves.ease),
         ),
       );
@@ -48,7 +48,7 @@ class StaggeredAnimation extends StatelessWidget {
   late final Animation<double> height = Tween<double>(begin: 50.0, end: 150.0)
       .animate(
         CurvedAnimation(
-          parent: controller,
+          parent: animation,
           curve: const Interval(0.25, 0.375, curve: Curves.ease),
         ),
       );
@@ -59,7 +59,7 @@ class StaggeredAnimation extends StatelessWidget {
         end: BorderRadius.circular(75),
       ).animate(
         CurvedAnimation(
-          parent: controller,
+          parent: animation,
           curve: const Interval(0.375, 0.5, curve: Curves.ease),
         ),
       );
@@ -67,12 +67,12 @@ class StaggeredAnimation extends StatelessWidget {
   late final Animation<Color?> color =
       ColorTween(begin: Colors.red, end: Colors.orange).animate(
         CurvedAnimation(
-          parent: controller,
+          parent: animation,
           curve: const Interval(0.5, 0.625, curve: Curves.ease),
         ),
       );
 
-  final AnimationController controller;
+  final Animation<double> animation;
 
   Widget _buildAnimation(BuildContext context, Widget? child) {
     return Center(
@@ -93,7 +93,7 @@ class StaggeredAnimation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(animation: controller, builder: _buildAnimation);
+    return AnimatedBuilder(animation: animation, builder: _buildAnimation);
   }
 }
 
@@ -134,7 +134,6 @@ class _StaggeredDemoState extends State<StaggeredDemo>
 
   @override
   Widget build(BuildContext context) {
-    timeDilation = 10.0;
     return Scaffold(
       appBar: AppBar(title: const Text('Staggered Animation')),
       body: GestureDetector(
@@ -148,7 +147,7 @@ class _StaggeredDemoState extends State<StaggeredDemo>
               color: Colors.black.withValues(alpha: 0.1),
               border: Border.all(color: Colors.black.withValues(alpha: 0.5)),
             ),
-            child: StaggeredAnimation(controller: _controller.view),
+            child: StaggeredAnimation(animation: _controller.view),
           ),
         ),
       ),

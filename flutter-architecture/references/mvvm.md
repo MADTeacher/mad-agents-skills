@@ -11,13 +11,15 @@ MVVM separates application features into three parts:
 
 ## Component Relationships
 
-Every feature contains:
+Every screen or user flow usually contains:
 - One **View** (UI)
 - One **ViewModel** (UI logic)
 - One or more **Repositories** (data sources)
 - Zero or more **Services** (external API access)
+- Zero or more **Use-cases** for complex or reused business logic
 
-Views and ViewModels have a **one-to-one relationship**.
+Views and ViewModels normally have a **one-to-one relationship** at the screen
+or flow level. A View may be composed of many smaller widgets.
 
 ## View Layer
 
@@ -44,6 +46,8 @@ Responsibilities:
 - Filter, sort, aggregate data for presentation
 - Track UI state (flags, carousel positions, etc.)
 - Expose commands for button presses, form submissions, etc.
+- Call repositories directly for simple operations, or call use-cases when the
+  logic is complex, reused, or spans multiple repositories.
 
 ## Model Layer
 
@@ -66,6 +70,11 @@ Relationships:
 - One ViewModel can use multiple Repositories
 - One Repository can be used by multiple ViewModels
 - Repositories should never be aware of each other
+
+### Use-cases (Optional)
+Use-cases sit between ViewModels and Repositories only when they reduce
+duplication or isolate complex business rules. Do not add them to simple CRUD
+flows just to fill a layer.
 
 ### Services
 Lowest layer, wrap API endpoints and expose async response objects.
@@ -91,7 +100,7 @@ Relationships:
 ### User Interaction Flow
 1. View: User interaction triggers event
 2. View: Event handler calls ViewModel command
-3. ViewModel: Command calls Repository method
+3. ViewModel: Command calls Repository directly, or a Use-case when justified
 4. Repository: Updates data and returns new data
 5. ViewModel: Saves new state
 6. View: UI rebuilds with new state

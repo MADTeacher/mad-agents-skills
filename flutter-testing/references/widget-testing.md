@@ -338,18 +338,30 @@ testWidgets('scroll until specific item is visible', (tester) async {
 
 ```dart
 testWidgets('validates email field', (tester) async {
+  final formKey = GlobalKey<FormState>();
+
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
         body: Form(
-          child: TextFormField(
-            key: const Key('email'),
-            validator: (value) {
-              if (value == null || !value.contains('@')) {
-                return 'Invalid email';
-              }
-              return null;
-            },
+          key: formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                key: const Key('email'),
+                validator: (value) {
+                  if (value == null || !value.contains('@')) {
+                    return 'Invalid email';
+                  }
+                  return null;
+                },
+              ),
+              ElevatedButton(
+                key: const Key('submit'),
+                onPressed: () => formKey.currentState!.validate(),
+                child: const Text('Submit'),
+              ),
+            ],
           ),
         ),
       ),
@@ -358,6 +370,7 @@ testWidgets('validates email field', (tester) async {
   
   // Enter invalid email
   await tester.enterText(find.byKey(const Key('email')), 'invalid');
+  await tester.tap(find.byKey(const Key('submit')));
   await tester.pump();
   
   // Should show error
@@ -365,6 +378,7 @@ testWidgets('validates email field', (tester) async {
   
   // Enter valid email
   await tester.enterText(find.byKey(const Key('email')), 'test@example.com');
+  await tester.tap(find.byKey(const Key('submit')));
   await tester.pump();
   
   // Should hide error

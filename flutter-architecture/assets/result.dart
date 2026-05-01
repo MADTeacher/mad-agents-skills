@@ -1,3 +1,6 @@
+// Template asset: copy or adapt this only when the project does not already
+// have an equivalent typed result/error model.
+
 /// Utility class to wrap result data
 ///
 /// Evaluate the result using a switch statement:

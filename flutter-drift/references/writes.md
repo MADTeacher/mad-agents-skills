@@ -1,252 +1,204 @@
 ---
 title: Insert, Update, Delete
-description: Write operations in drift
+description: Implement Drift writes, companions, transactions, and batches
 ---
+
+## Scope Rule
+
+From Flutter code outside the database class, call write builders on the database instance:
+
+```dart
+await database.into(database.todoItems).insert(
+  TodoItemsCompanion.insert(title: title),
+);
+```
+
+Use bare `into(todoItems)`, `update(todoItems)`, and `delete(todoItems)` only inside `GeneratedDatabase` or `DatabaseAccessor` code.
 
 ## Insert
 
-### Simple Insert
-
-Insert a single row:
+Insert a row with required values:
 
 ```dart
-final id = await into(todoItems).insert(
+final id = await database.into(database.todoItems).insert(
   TodoItemsCompanion.insert(
     title: 'First todo',
-    content: 'Some description',
+    content: const Value('Some description'),
   ),
 );
 ```
 
-Columns with default values or auto-increment can be omitted.
-
-### Insert with Auto Increment
+Omit nullable columns and columns with SQL defaults:
 
 ```dart
-final id = await into(todoItems).insert(
-  TodoItemsCompanion.insert(
-    title: 'First todo',
-  ),
+final id = await database.into(database.todoItems).insert(
+  TodoItemsCompanion.insert(title: 'First todo'),
 );
 ```
 
-### Bulk Insert
+Insert multiple rows in a batch:
 
 ```dart
-await batch((batch) {
-  batch.insertAll(todoItems, [
-    TodoItemsCompanion.insert(
-      title: 'First entry',
-      content: 'My content',
-    ),
+await database.batch((batch) {
+  batch.insertAll(database.todoItems, [
+    TodoItemsCompanion.insert(title: 'First entry'),
     TodoItemsCompanion.insert(
       title: 'Another entry',
-      content: 'More content',
-      category: const Value(3),
+      priority: const Value(2),
     ),
   ]);
 });
 ```
 
-### Upsert (Insert or Update)
+## Upsert
 
-Insert if doesn't exist, update if exists:
+Use `insertOnConflictUpdate` when the row has a primary key or unique key that should be replaced on conflict.
 
 ```dart
-final id = await into(users).insertOnConflictUpdate(
-  UsersCompanion.insert(
-    email: 'user@example.com',
-    name: 'John Doe',
+await database.into(database.todoItems).insertOnConflictUpdate(
+  TodoItemsCompanion.insert(
+    id: const Value(1),
+    title: 'Updated title',
   ),
 );
 ```
 
-Requires SQLite 3.24.0+.
-
-### Custom Conflict Target
-
-For upsert with custom unique constraints:
+For custom conflict handling, pass a `DoUpdate` clause with an update companion:
 
 ```dart
-final id = await into(products).insert(
-  ProductsCompanion.insert(
-    sku: 'ABC123',
-    name: 'Product Name',
+await database.into(database.todoItems).insert(
+  TodoItemsCompanion.insert(
+    id: const Value(1),
+    title: 'Important',
   ),
   onConflict: DoUpdate(
-    target: [sku],
+    (old) => const TodoItemsCompanion(
+      priority: Value(5),
+    ),
   ),
 );
 ```
 
-### Insert Returning
-
-Get inserted row with generated values:
+Use `insertReturning` only when the target SQLite runtime supports `RETURNING`.
 
 ```dart
-final row = await into(todos).insertReturning(
-  TodosCompanion.insert(
-    title: 'A todo entry',
-    content: 'A description',
-  ),
+final row = await database.into(database.todoItems).insertReturning(
+  TodoItemsCompanion.insert(title: 'A todo entry'),
 );
 ```
-
-Requires SQLite 3.35+.
 
 ## Update
 
-### Simple Update
-
-Update all matching rows:
+Always add a `where` clause unless the intent is truly to update every row.
 
 ```dart
-await (update(todoItems)
-  ..where((t) => t.id.equals(1))
-  .write(TodoItemsCompanion(
-    title: const Value('Updated title'),
-  ));
-```
-
-### Replace
-
-Replace entire row:
-
-```dart
-await update(todoItems).replace(
-  TodoItem(
-    id: 1,
-    title: 'Updated title',
-    content: 'Updated content',
+await (database.update(database.todoItems)
+      ..where((t) => t.id.equals(id)))
+    .write(
+  const TodoItemsCompanion(
+    title: Value('Updated title'),
   ),
 );
 ```
 
-### Partial Update
-
-Only update specific fields:
+Update multiple columns with a companion:
 
 ```dart
-await (update(todoItems)
-  ..where((t) => t.id.equals(1))
-  .write(TodoItemsCompanion(
-    title: const Value('Updated title'),
-    isCompleted: const Value(true),
-  ));
+await (database.update(database.todoItems)
+      ..where((t) => t.id.equals(id)))
+    .write(
+  const TodoItemsCompanion(
+    title: Value('Updated title'),
+    isCompleted: Value(true),
+  ),
+);
 ```
 
-### Update with SQL Expression
+Use `replace` only when you have a complete generated data row:
 
 ```dart
-await (update(users)
-  .write(UsersCompanion.custom(
-    name: users.name.lower(),
-  ));
+await database.update(database.todoItems).replace(
+  todo.copyWith(isCompleted: true),
+);
+```
+
+Use custom expressions for SQL-side updates:
+
+```dart
+await (database.update(database.todoItems)
+      ..where((t) => t.id.equals(id)))
+    .write(
+  TodoItemsCompanion.custom(
+    priority: database.todoItems.priority + const Constant(1),
+  ),
+);
 ```
 
 ## Delete
 
-### Delete Matching Rows
+Delete matching rows with `where` and `go()`:
 
 ```dart
-await (delete(todoItems)
-  ..where((t) => t.id.equals(1))
-  .go();
+await (database.delete(database.todoItems)
+      ..where((t) => t.id.equals(id)))
+    .go();
 ```
 
-### Delete Multiple
+Delete multiple rows:
 
 ```dart
-await (delete(todoItems)
-  ..where((t) => t.isCompleted.equals(true))
-  .go();
+await (database.delete(database.todoItems)
+      ..where((t) => t.isCompleted.equals(true)))
+    .go();
 ```
 
-### Delete All
+Delete all rows only when that is explicitly intended:
 
 ```dart
-await delete(todoItems).go();
+await database.delete(database.todoItems).go();
 ```
 
-### Delete Limit
+Do not use `delete(table).go(id)`. That is not Drift's delete API.
 
-```dart
-await (delete(todoItems)
-  ..where((t) => t.id.isSmallerThanValue(10))
-  .go();
-```
+## Companions And Value
 
-## Companions vs Data Classes
-
-### Data Class (TodoItem)
-
-Holds all fields, represents a full row:
-
-```dart
-final todo = TodoItem(
-  id: 1,
-  title: 'Title',
-  content: 'Content',
-  createdAt: DateTime.now(),
-);
-```
-
-### Companion (TodoItemsCompanion)
-
-Used for partial data, updates, and inserts:
+Generated data classes represent full rows. Companions represent partial writes.
 
 ```dart
 final companion = TodoItemsCompanion(
   title: const Value('Title'),
   content: const Value('Content'),
-  createdAt: Value.absent(),
+  priority: const Value(2),
+  category: const Value.absent(),
 );
 ```
 
-### Value States
+For nullable fields, distinguish setting `NULL` from leaving a column unchanged:
 
-- `Value(value)` - set to this value
-- `Value.absent()` - don't update this column
-- `const Value(value)` - for non-nullable values
+```dart
+const TodoItemsCompanion(
+  category: Value<int?>(null),
+);
 
-### Important Distinctions
-
-`category: Value(null)` - SET category = NULL
-`category: Value.absent()` - don't change category
+const TodoItemsCompanion(
+  category: Value.absent(),
+);
+```
 
 ## Transactions
 
-### Simple Transaction
+Use transactions for multi-step writes that must succeed or fail together.
 
 ```dart
-await transaction(() async {
-  await into(todoItems).insert(
+final categoryId = await database.transaction(() async {
+  final id = await database.into(database.categories).insert(
+    CategoriesCompanion.insert(name: 'Work'),
+  );
+
+  await database.into(database.todoItems).insert(
     TodoItemsCompanion.insert(
-      title: 'First todo',
-    ),
-  );
-
-  await into(categories).insert(
-    CategoriesCompanion.insert(
-      name: 'New Category',
-    ),
-  );
-});
-```
-
-### Transaction with Result
-
-```dart
-final result = await transaction(() async {
-  final id = await into(todoItems).insert(
-    TodoItemsCompanion.insert(
-      title: 'First todo',
-    ),
-  );
-
-  await into(categories).insert(
-    CategoriesCompanion.insert(
-      name: 'New Category',
+      title: 'First work todo',
+      category: Value(id),
     ),
   );
 
@@ -254,75 +206,48 @@ final result = await transaction(() async {
 });
 ```
 
-### Rollback on Error
-
-```dart
-try {
-  await transaction(() async {
-    await update(todoItems).write(
-      TodoItemsCompanion(
-        title: const Value('Updated'),
-      ),
-    );
-
-    await someOtherOperation();
-  });
-} catch (e) {
-  print('Transaction rolled back: $e');
-}
-```
+Errors thrown inside the callback roll the transaction back.
 
 ## Batch Operations
 
-### Batch Insert and Update
+Batches are useful for many similar writes.
 
 ```dart
-await batch((batch) {
-  batch.insertAll(todoItems, [
+await database.batch((batch) {
+  batch.insertAll(database.todoItems, [
     TodoItemsCompanion.insert(title: 'First'),
     TodoItemsCompanion.insert(title: 'Second'),
   ]);
 
-  batch.updateAll(todoItems, [
-    TodoItemsCompanion(
-      id: 1,
-      title: const Value('Updated'),
-    ),
-  ]);
+  batch.update(
+    database.todoItems,
+    const TodoItemsCompanion(priority: Value(1)),
+    where: (t) => t.isCompleted.equals(false),
+  );
+
+  batch.deleteWhere(
+    database.todoItems,
+    (t) => t.isCompleted.equals(true),
+  );
 });
 ```
 
-### Batch with Mixed Operations
+Use `batch.delete(table, row)` only when you have an insertable row with the primary key. Use `batch.deleteWhere` for predicates.
+
+## Write Safety
+
+Avoid broad updates and deletes in UI actions:
 
 ```dart
-await batch((batch) {
-  batch.insert(todoItems, TodoItemsCompanion.insert(title: 'New'));
-  batch.update(todoItems, TodoItemsCompanion(
-    id: 1,
-    title: const Value('Updated'),
-  ));
-  batch.delete(todoItems, 2);
-});
-```
-
-## Warning
-
-Always add `where` clause on updates and deletes:
-
-```dart
-// BAD - updates ALL rows!
-await update(todoItems).write(
-  TodoItemsCompanion(
-    isCompleted: const Value(true),
-  ),
+// Bad: updates every todo.
+await database.update(database.todoItems).write(
+  const TodoItemsCompanion(isCompleted: Value(true)),
 );
 
-// GOOD - only updates matching rows
-await (update(todoItems)
-  ..where((t) => t.id.equals(1))
-  .write(
-    TodoItemsCompanion(
-      isCompleted: const Value(true),
-    ),
-  );
+// Good: updates one row.
+await (database.update(database.todoItems)
+      ..where((t) => t.id.equals(id)))
+    .write(
+  const TodoItemsCompanion(isCompleted: Value(true)),
+);
 ```

@@ -97,24 +97,25 @@ Each skill includes:
 
 **Directory:** `dart-drift/`
 
-**Description:** A complete guide to using the drift library for working with databases in Dart applications (CLI, server applications, non-Flutter desktop apps).
+**Description:** An operational workflow for adding, fixing, migrating, and validating Drift persistence in Dart CLI, server-side, and non-Flutter desktop apps.
 
 **When to use:**
 
-- Building Dart apps that need a local SQLite store
-- Connecting to PostgreSQL with type-safe queries
-- Reactive data streams
-- Implementing database schema migrations
-- Building server services with connection pooling
+- Adding local SQLite storage with `package:drift/native.dart`
+- Connecting server-side apps to PostgreSQL with `drift_postgres`
+- Writing type-safe tables, queries, writes, and reactive streams
+- Implementing and validating database schema migrations
+- Fixing `build_runner`, `drift_dev`, or generated-code failures
 
 **Key capabilities:**
 
-- Setup with `sqlite3` or `drift_postgres`
+- Setup with `sqlite3`, `drift_postgres`, and `package:postgres`
 - Defining tables and constraints
 - SELECT, WHERE, JOIN, aggregations
 - INSERT, UPDATE, DELETE, transactions
 - Reactive stream queries
-- Database schema migrations
+- Database schema migrations and generated migration tests
+- Deterministic smoke validation via `scripts/verify-examples.sh`
 
 **References:**
 
@@ -452,7 +453,7 @@ Each skill includes:
 
 **Directory:** `flutter-networking/`
 
-**Description:** A comprehensive guide to networking in Flutter, including HTTP, WebSocket, authentication, and error handling.
+**Description:** Implement, debug, review, and harden Flutter networking, including HTTP/REST APIs, WebSocket flows, authentication, error handling, and performance.
 
 **When to use:**
 
@@ -461,6 +462,8 @@ Each skill includes:
 - Authenticated requests with headers and tokens
 - Background parsing with isolates
 - REST API integration
+- Debugging or reviewing existing networking code
+- Adapting to existing `http`, Dio, Retrofit, Chopper, or custom clients
 - Handling network errors
 - Optimizing networking performance
 
@@ -618,7 +621,7 @@ Each skill includes:
 
 **Directory:** `flutter-duit-bdui/`
 
-**Description:** A comprehensive guide to integrating the BDUI framework [flutter_duit](https://pub.dev/packages/flutter_duit) into Flutter apps.
+**Description:** An agent workflow for integrating, fixing, reviewing, and validating the BDUI framework [flutter_duit](https://pub.dev/packages/flutter_duit) in Flutter apps.
 
 **When to use:**
 
@@ -630,9 +633,9 @@ Each skill includes:
 
 **References:**
 
-- [capabilities.md](./flutter-duit-bdui/references/capabiliteis.md) — Notes on capability-based design and overriding core framework parts.
+- [capabilities.md](./flutter-duit-bdui/references/capabilities.md) — Notes on capability-based design and overriding core framework parts.
 - [troubleshooting.md](./flutter-duit-bdui/references/troubleshooting.md) — Notes on common framework integration issues.
-- [environvent_vars.md](./flutter-duit-bdui/references//environment_vars.md) — Notes on available environment variables and how to use them.
+- [environment_vars.md](./flutter-duit-bdui/references/environment_vars.md) — Notes on available environment variables and how to use them.
 - [public_api.md](./flutter-duit-bdui/references/public_api.md) — Notes on the driver’s public API.
 - <https://duit.pro/docs/en> — Official documentation website
 

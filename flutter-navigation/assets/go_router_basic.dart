@@ -33,7 +33,13 @@ class HomeScreen extends StatelessWidget {
       body: Center(
         child: ElevatedButton(
           child: const Text('Go to details'),
-          onPressed: () => context.push('/details?id=123'),
+          onPressed: () {
+            final location = Uri(
+              path: '/details',
+              queryParameters: {'id': '123'},
+            ).toString();
+            context.push(location);
+          },
         ),
       ),
     );

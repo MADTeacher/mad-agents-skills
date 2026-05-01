@@ -1,6 +1,13 @@
 ---
 name: flutter-architecture
-description: Comprehensive guide for architecting Flutter applications following MVVM pattern and best practices with feature-first project organization. Use when working with Flutter projects to structure code properly, implement clean architecture layers (UI, Data, Domain), apply recommended design patterns, and organize projects using feature-first approach for scalable, maintainable apps.
+description: >-
+  Design, refactor, review, or implement Flutter app architecture using MVVM,
+  layered UI/Data/optional Domain boundaries, feature-first or layer-first
+  project structure, repositories, services, dependency injection, Result and
+  Command patterns, offline-first or optimistic UI flows. Use when asked to add
+  a Flutter feature, audit layer dependencies, fix cross-feature imports,
+  migrate to feature-first, choose architecture for a Flutter project, or create
+  scalable maintainable Flutter code organization.
 metadata:
   author: Stanislav [MADTeacher] Chernyshev
   version: "1.0"
@@ -8,162 +15,91 @@ metadata:
 
 # Flutter Architecture
 
-## Overview
+You are an architecture agent for Flutter apps. Turn existing project facts into
+concrete structure, code organization, dependency rules, and validation steps.
+Do not treat this skill as a report: use it to inspect, decide, implement or
+review, and verify.
 
-Provides architectural guidance and best practices for building scalable Flutter applications using MVVM pattern, layered architecture, and recommended design patterns from the Flutter team.
+## Core Contract
 
-## Project Structure: Feature-First vs Layer-First
+1. Confirm the target is a Flutter or Dart package by inspecting `pubspec.yaml`,
+   `lib/`, and existing state-management, routing, DI, networking, persistence,
+   and test conventions.
+2. Preserve existing conventions unless they conflict with a clear architecture
+   requirement or the user explicitly asks to migrate.
+3. Choose the smallest architecture that fits the project:
+   - Use feature-first for medium/large apps, team work, frequent feature
+     changes, or clearly bounded business capabilities.
+   - Use layer-first for small apps, solo work, or simple CRUD flows.
+   - Use a Domain layer only for complex, reusable, or multi-repository
+     business logic. ViewModels may call Repositories directly for simple flows.
+4. Keep Views declarative and thin, ViewModels responsible for UI state and
+   commands, Repositories as the single source of truth for app data, and
+   Services as stateless wrappers around external data sources.
+5. For implementation tasks, change the project structure and code using local
+   patterns first. Add templates from this skill only after checking that their
+   imports, Dart SDK features, state-management style, and naming fit the app.
+6. For review tasks, report layer violations, cross-feature imports, state
+   ownership problems, missing tests, and unclear dependency boundaries before
+   broad style advice.
+7. Validate with the repo's normal commands. Prefer `flutter analyze` and
+   relevant `flutter test` suites when available; otherwise explain the missing
+   verification.
 
-Choose the right project organization based on your app's complexity and team size.
+## Clarification Rules
 
-### Feature-First (Recommended for teams)
+Ask the user only when a high-impact decision cannot be inferred from the
+project:
 
-Organize code by business features:
+- product boundary of a new feature;
+- expected scale of team or app when structure choice is ambiguous;
+- offline-first, sync, or conflict-resolution requirements;
+- whether a migration should be incremental or all-at-once.
 
-```
-lib/
-├── features/
-│   ├── auth/
-│   │   ├── data/
-│   │   ├── domain/
-│   │   └── presentation/
-│   ├── todos/
-│   │   ├── data/
-│   │   ├── domain/
-│   │   └── presentation/
-│   └── settings/
-│       ├── data/
-│       ├── domain/
-│       └── presentation/
-├── shared/
-│   ├── core/
-│   ├── data/
-│   └── ui/
-└── main.dart
-```
+If the project is unavailable or is not a Flutter project, give an architecture
+plan or review based on the provided context, do not invent repository facts, and
+state that code validation could not be performed.
 
-**When to use:**
-- Medium to large apps (10+ features)
-- Team development (2+ developers)
-- Frequently adding/removing features
-- Complex business logic
+## Resource Routing
 
-**Benefits:**
-- Features are self-contained units
-- Easy to add/remove entire features
-- Clear feature boundaries
-- Reduced merge conflicts
-- Teams work independently on features
+Read only the references needed for the current task:
 
-See [Feature-First Guide](references/feature-first.md) for complete implementation details.
+| Need | Read | Use for |
+|---|---|---|
+| Basic principles or vocabulary | [concepts.md](references/concepts.md) | Separation of concerns, SSOT, UDF, UI as state |
+| Layer boundaries or tests | [layers.md](references/layers.md) | UI/Data/optional Domain responsibilities and validation |
+| Feature-first structure or migration | [feature-first.md](references/feature-first.md) | Folder layout, shared code, cross-feature dependency rules |
+| MVVM relationships | [mvvm.md](references/mvvm.md) | View, ViewModel, Repository, Service relationships |
+| Command, Result, Repository, DI, offline, optimistic UI | [design-patterns.md](references/design-patterns.md) | Pattern selection and code examples |
+| Command template | [command.dart](assets/command.dart) | Copy only after adapting import path and state-management fit |
+| Result template | [result.dart](assets/result.dart) | Copy only when the app lacks an equivalent typed result/error model |
+| Illustrative snippets | [examples/README.md](assets/examples/README.md) | Use as examples, not as a required workflow |
 
-### Layer-First (Traditional)
+## Architecture Defaults
 
-Organize code by architectural layers:
+- Canonical dependency rule: lower layers must not depend on upper layers.
+  ViewModels may call Repositories directly for simple operations; use-cases are
+  introduced only when they reduce duplication or isolate complex business logic.
+- Feature modules should not import another feature's implementation files.
+  Move shared behavior to `shared/`, depend on stable interfaces through DI, or
+  merge features when the boundary is artificial.
+- Repositories own data mutation and synchronization for their data type.
+  Services should stay stateless and should not own business state.
+- Do not add folders just to satisfy a diagram. Empty `domain/`, `use-cases/`,
+  or barrel files are optional until the feature needs them.
 
-```
-lib/
-├── data/
-│   ├── repositories/
-│   ├── services/
-│   └── models/
-├── domain/
-│   ├── use-cases/
-│   └── entities/
-├── presentation/
-│   ├── views/
-│   └── viewmodels/
-└── shared/
-```
+## Validation
 
-**When to use:**
-- Small to medium apps
-- Few features (<10)
-- Solo developers or small teams
-- Simple business logic
+Before finishing an implementation or review:
 
-**Benefits:**
-- Clear separation by layer
-- Easy to find components by type
-- Less nesting
-
-## Quick Start
-
-Start with these core concepts:
-
-1. **Separation of concerns** - Split app into UI and Data layers
-2. **MVVM pattern** - Use Views, ViewModels, Repositories, and Services
-3. **Single source of truth** - Repositories hold the authoritative data
-4. **Unidirectional data flow** - State flows from data → logic → UI
-
-For detailed concepts, see [Concepts](references/concepts.md).
-
-## Architecture Layers
-
-Flutter apps should be structured in layers:
-
-- **UI Layer**: Views (widgets) and ViewModels (UI logic)
-- **Data Layer**: Repositories (SSOT) and Services (data sources)
-- **Domain Layer** (optional): Use-cases for complex business logic
-
-See [Layers Guide](references/layers.md) for detailed layer responsibilities and interactions.
-
-## Core Components
-
-### Views
-- Compose widgets for UI presentation
-- Contain minimal logic (animations, simple conditionals, routing)
-- Receive data from ViewModels
-- Pass events via ViewModel commands
-
-### ViewModels
-- Transform repository data into UI state
-- Manage UI state and commands
-- Handle business logic for UI interactions
-- Expose state as streams or change notifiers
-
-### Repositories
-- Single source of truth for data types
-- Aggregate data from services
-- Handle caching, error handling, retry logic
-- Expose data as domain models
-
-### Services
-- Wrap external data sources (APIs, databases, platform APIs)
-- Stateless data access layer
-- One service per data source
-
-## Design Patterns
-
-Common patterns for robust Flutter apps:
-
-- **Command Pattern** - Encapsulate actions with Result handling
-- **Result Type** - Type-safe error handling
-- **Repository Pattern** - Abstraction over data sources
-- **Offline-First** - Optimistic UI updates with sync
-
-See [Design Patterns](references/design-patterns.md) for implementation details.
-
-## When to Use This Skill
-
-Use this skill when:
-- Designing or refactoring Flutter app architecture
-- Choosing between feature-first and layer-first project structure
-- Implementing MVVM pattern in Flutter
-- Creating scalable app structure for teams
-- Adding new features to existing architecture
-- Applying best practices and design patterns
-
-## Resources
-
-### references/
-- [concepts.md](references/concepts.md) - Core architectural principles (separation of concerns, SSOT, UDF)
-- [feature-first.md](references/feature-first.md) - Feature-first project organization and best practices
-- [mvvm.md](references/mvvm.md) - MVVM pattern implementation in Flutter
-- [layers.md](references/layers.md) - Detailed layer responsibilities and interactions
-- [design-patterns.md](references/design-patterns.md) - Common patterns and implementations
-
-### assets/
-- [command.dart](assets/command.dart) - Command pattern template for encapsulating actions
-- [result.dart](assets/result.dart) - Result type for safe error handling
-- [examples/](assets/examples/) - Code examples showing architecture in practice
+1. Check that new imports respect the chosen feature/layer boundary.
+2. Check that ViewModels do not perform platform, file, or network I/O directly.
+3. Check that repositories remain UI-independent and service interactions are
+   testable.
+4. Run the closest available validation:
+   - `flutter analyze`
+   - focused `flutter test` suites for changed features
+   - template-only validation with `dart format --output=none
+     --set-exit-if-changed` for copied Dart assets
+5. Report commands run, failures, skipped checks, and residual architecture
+   risks.

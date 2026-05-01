@@ -8,14 +8,17 @@ The Command pattern encapsulates actions with state management and Result handli
 
 ### Basic Usage
 
+After copying `command.dart` and `result.dart` into your project, update these
+imports to match their final package path.
+
 ```dart
 import 'package:flutter/foundation.dart';
-import '../assets/command.dart';
-import '../assets/result.dart';
+import 'command.dart';
+import 'result.dart';
 
 class TodoViewModel extends ChangeNotifier {
   Command0<void> get loadTodos => _loadTodosCommand;
-  final _loadTodosCommand = Command0<void>(_loadTodos);
+  late final _loadTodosCommand = Command0<void>(_loadTodos);
 
   Future<Result<void>> _loadTodos() async {
     // Load todos from repository
@@ -76,13 +79,13 @@ class TodoRepository {
 
   TodoRepository(this._api, this._database);
 
-  Future<Result<void>> addTodo(Todo todo) async {
+  Future<Result<Todo>> addTodo(Todo todo) async {
     try {
-      await _api.createTodo(todo);
-      await _database.saveTodo(todo);
-      return Result.ok(null);
+      final savedTodo = await _api.createTodo(todo);
+      await _database.saveTodo(savedTodo);
+      return Result.ok(savedTodo);
     } catch (e) {
-      return Result.error(e);
+      return Result.error(e is Exception ? e : Exception(e.toString()));
     }
   }
 }
@@ -90,10 +93,11 @@ class TodoRepository {
 
 ## Optimistic UI Example
 
-Update UI immediately, then sync:
+Update UI immediately, then sync. The repository returns the server-confirmed
+`Todo` so the temporary item can be replaced safely:
 
 ```dart
-Future<Result<void>> addTodo(Todo todo) async {
+Future<Result<Todo>> addTodo(Todo todo) async {
   // Optimistic update
   _todos = [..._todos, todo];
   notifyListeners();
@@ -108,7 +112,11 @@ Future<Result<void>> addTodo(Todo todo) async {
     return result;
   }
 
-  return Result.ok(null);
+  final serverTodo = result.asOk.value;
+  _todos = _todos.map((t) => t.id == todo.id ? serverTodo : t).toList();
+  notifyListeners();
+
+  return Result.ok(serverTodo);
 }
 ```
 

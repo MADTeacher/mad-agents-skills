@@ -24,7 +24,10 @@ Implements core business logic, facilitates interaction between data and UI laye
 ### Data Layer
 Manages interactions with data sources (databases, APIs, platform plugins). Exposes data and methods to business logic layer.
 
-Layers communicate only with adjacent layers. UI doesn't know data layer exists, and vice versa.
+Lower layers should not depend on upper layers. ViewModels in the UI layer may
+call Repositories directly for simple flows, or go through optional Domain
+Use-cases when business logic is complex, reused, or spans multiple
+Repositories. Views should not call Services directly.
 
 ## Single Source of Truth (SSOT)
 

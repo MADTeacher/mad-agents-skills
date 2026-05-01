@@ -1,315 +1,124 @@
 ---
 name: flutter-networking
-description: Comprehensive Flutter networking guidance including HTTP CRUD operations, WebSocket connections, authentication, error handling, and performance optimization. Use when Claude needs to implement HTTP requests GET POST PUT DELETE, WebSocket real-time communication, authenticated requests with headers and tokens, background parsing with isolates, REST API integration with proper error handling, or any network-related functionality in Flutter applications.
+description: >-
+  Implement, fix, debug, review, or refactor Flutter networking code for
+  HTTP/REST APIs, WebSocket realtime flows, authentication and token refresh,
+  request headers, timeouts, retries, JSON parsing, caching, background isolates,
+  repositories, services, and adaptation to existing http, Dio, Retrofit,
+  Chopper, or custom API clients. Use when asked to add network requests,
+  investigate network errors, harden API clients, handle auth, or validate
+  Flutter network behavior.
 metadata:
   author: Stanislav [MADTeacher] Chernyshev
-  version: "1.0"
+  version: "2.0"
 ---
 
 # Flutter Networking
 
-## Quick Start
-
-Add HTTP dependency to `pubspec.yaml`:
-
-```yaml
-dependencies:
-  http: ^1.6.0
-```
-
-Basic GET request:
-
-```dart
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
-Future<Album> fetchAlbum() async {
-  final response = await http.get(
-    Uri.parse('https://api.example.com/albums/1'),
-  );
-
-  if (response.statusCode == 200) {
-    return Album.fromJson(jsonDecode(response.body));
-  } else {
-    throw Exception('Failed to load album');
-  }
-}
-```
-
-Use in UI with `FutureBuilder`:
-
-```dart
-FutureBuilder<Album>(
-  future: futureAlbum,
-  builder: (context, snapshot) {
-    if (snapshot.hasData) {
-      return Text(snapshot.data!.title);
-    } else if (snapshot.hasError) {
-      return Text('${snapshot.error}');
-    }
-    return const CircularProgressIndicator();
-  },
-)
-```
-
-## HTTP Methods
-
-### GET - Fetch Data
-
-Use for retrieving data. See [http-basics.md](references/http-basics.md) for complete examples.
-
-### POST - Create Data
-
-Use for creating new resources. Requires `Content-Type: application/json` header.
-
-```dart
-final response = await http.post(
-  Uri.parse('https://api.example.com/albums'),
-  headers: <String, String>{
-    'Content-Type': 'application/json; charset=UTF-8',
-  },
-  body: jsonEncode(<String, String>{'title': title}),
-);
-```
-
-See [http-basics.md](references/http-basics.md) for POST examples.
-
-### PUT - Update Data
-
-Use for updating existing resources.
-
-```dart
-final response = await http.put(
-  Uri.parse('https://api.example.com/albums/1'),
-  headers: <String, String>{
-    'Content-Type': 'application/json; charset=UTF-8',
-  },
-  body: jsonEncode(<String, String>{'title': title}),
-);
-```
-
-### DELETE - Remove Data
-
-Use for deleting resources.
-
-```dart
-final response = await http.delete(
-  Uri.parse('https://api.example.com/albums/1'),
-  headers: <String, String>{
-    'Content-Type': 'application/json; charset=UTF-8',
-  },
-);
-```
-
-## WebSocket
-
-Add WebSocket dependency:
-
-```yaml
-dependencies:
-  web_socket_channel: ^3.0.3
-```
-
-Basic WebSocket connection:
-
-```dart
-import 'package:web_socket_channel/web_socket_channel.dart';
-
-final _channel = WebSocketChannel.connect(
-  Uri.parse('wss://echo.websocket.events'),
-);
-
-// Listen for messages
-StreamBuilder(
-  stream: _channel.stream,
-  builder: (context, snapshot) {
-    return Text(snapshot.hasData ? '${snapshot.data}' : '');
-  },
-)
-
-// Send message
-_channel.sink.add('Hello');
-
-// Close connection
-_channel.sink.close();
-```
-
-See [websockets.md](references/websockets.md) for complete WebSocket implementation.
-
-## Authentication
-
-Add authorization headers to requests:
-
-```dart
-import 'dart:io';
-
-final response = await http.get(
-  Uri.parse('https://api.example.com/data'),
-  headers: {HttpHeaders.authorizationHeader: 'Bearer $token'},
-);
-```
-
-Common authentication patterns:
-- **Bearer Token**: `Authorization: Bearer <token>`
-- **Basic Auth**: `Authorization: Basic <base64_credentials>`
-- **API Key**: `X-API-Key: <key>`
-
-See [authentication.md](references/authentication.md) for detailed authentication strategies.
-
-## Error Handling
-
-Handle HTTP errors appropriately:
-
-```dart
-if (response.statusCode >= 200 && response.statusCode < 300) {
-  return Data.fromJson(jsonDecode(response.body));
-} else if (response.statusCode == 401) {
-  throw UnauthorizedException();
-} else if (response.statusCode == 404) {
-  throw NotFoundException();
-} else {
-  throw ServerException();
-}
-```
-
-See [error-handling.md](references/error-handling.md) for comprehensive error handling strategies.
-
-## Performance
-
-### Background Parsing with Isolates
-
-For large JSON responses, use `compute()` to parse in background isolate:
-
-```dart
-import 'package:flutter/foundation.dart';
-
-Future<List<Photo>> fetchPhotos(http.Client client) async {
-  final response = await client.get(
-    Uri.parse('https://api.example.com/photos'),
-  );
-
-  return compute(parsePhotos, response.body);
-}
-
-List<Photo> parsePhotos(String responseBody) {
-  final parsed = (jsonDecode(responseBody) as List)
-      .cast<Map<String, dynamic>>();
-  return parsed.map<Photo>((json) => Photo.fromJson(json)).toList();
-}
-```
-
-See [performance.md](references/performance.md) for optimization techniques.
-
-## Integration with Architecture
-
-When using MVVM architecture (see [flutter-architecture](../flutter-architecture/)):
-
-1. **Service Layer**: Create HTTP service for API endpoints
-2. **Repository Layer**: Aggregate data from services, handle caching
-3. **ViewModel Layer**: Transform repository data for UI
-
-Example service:
-
-```dart
-class AlbumService {
-  final http.Client _client;
-
-  AlbumService(this._client);
-
-  Future<Album> fetchAlbum(int id) async {
-    final response = await _client.get(
-      Uri.parse('https://api.example.com/albums/$id'),
-    );
-
-    if (response.statusCode == 200) {
-      return Album.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Failed to load album');
-    }
-  }
-}
-```
-
-## Common Patterns
-
-### Repository Pattern
-
-Single source of truth for data type:
-
-```dart
-class AlbumRepository {
-  final AlbumService _service;
-  final LocalStorage _cache;
-
-  Future<Album> getAlbum(int id) async {
-    try {
-      return await _cache.getAlbum(id) ?? 
-             await _service.fetchAlbum(id);
-    } catch (e) {
-      throw AlbumFetchException();
-    }
-  }
-}
-```
-
-### Retry Logic
-
-Implement exponential backoff for failed requests:
-
-```dart
-Future<T> fetchWithRetry<T>(
-  Future<T> Function() fetch, {
-  int maxRetries = 3,
-}) async {
-  for (int i = 0; i < maxRetries; i++) {
-    try {
-      return await fetch();
-    } catch (e) {
-      if (i == maxRetries - 1) rethrow;
-      await Future.delayed(Duration(seconds: 2 << i));
-    }
-  }
-  throw StateError('Unreachable');
-}
-```
-
-## Best Practices
-
-### DO
-
-- Use type-safe model classes with `fromJson` factories
-- Handle all HTTP status codes appropriately
-- Parse JSON in background isolates for large responses
-- Implement retry logic for transient failures
-- Cache responses when appropriate
-- Use proper timeouts
-- Secure tokens and credentials
-
-### DON'T
-
-- Parse JSON on main thread for large responses
-- Ignore error states in UI
-- Store tokens in source code or public repositories
-- Make requests without timeout configuration
-- Block UI thread with network operations
-- Throw generic exceptions without context
-
-## Resources
-
-### references/
-- [http-basics.md](references/http-basics.md) - Complete HTTP CRUD operations examples
-- [websockets.md](references/websockets.md) - WebSocket implementation patterns
-- [authentication.md](references/authentication.md) - Authentication strategies and token management
-- [error-handling.md](references/error-handling.md) - Comprehensive error handling patterns
-- [performance.md](references/performance.md) - Optimization techniques and best practices
-
-### assets/examples/
-- `fetch_example.dart` - Complete GET request with FutureBuilder
-- `post_example.dart` - POST request implementation
-- `websocket_example.dart` - WebSocket client with stream handling
-- `auth_example.dart` - Authenticated request example
-- `background_parsing.dart` - compute() for JSON parsing
-
-### assets/code-templates/
-- `http_service.dart` - Reusable HTTP service template
-- `repository_template.dart` - Repository pattern template
+You are a networking agent for Flutter apps. Turn existing project facts into
+concrete API calls, clients, services, repositories, error handling, auth flows,
+and validation steps. Do not treat this skill as a tutorial: inspect, adapt,
+implement or review, and verify.
+
+## Core Contract
+
+1. Confirm the target is a Flutter or Dart package by inspecting `pubspec.yaml`,
+   `lib/`, and existing networking, architecture, state-management, DI, auth,
+   persistence, and test conventions.
+2. Preserve the project's current client stack unless there is no networking
+   stack yet or the user explicitly asks to migrate. Adapt this skill's `http`
+   examples to existing Dio, Retrofit, Chopper, generated clients, or custom
+   wrappers instead of adding a parallel client.
+3. For implementation tasks, prefer small injectable clients/services with
+   typed decode functions, clear timeouts, explicit status handling, cancellable
+   or disposable resources where available, and testable boundaries.
+4. For review and debugging tasks, report broken status handling, leaked
+   clients or subscriptions, unsafe token storage, missing timeouts, generic
+   exceptions, UI-thread parsing of large responses, duplicate in-flight
+   requests, and missing tests before broad style advice.
+5. Keep UI networking thin. Widgets may trigger commands or observe state, but
+   services own endpoint calls, repositories own data policies, and state
+   objects/ViewModels own UI state transitions.
+6. Validate with the repo's normal commands. Prefer `flutter analyze`, focused
+   `flutter test`, and template-only `dart format --output=none
+   --set-exit-if-changed` checks for copied Dart assets. Explain skipped checks.
+
+## Clarification Rules
+
+Ask the user only when a high-impact decision cannot be inferred from the
+project:
+
+- API contract, endpoint base URL, auth mechanism, or token lifecycle is absent;
+- realtime behavior needs product semantics such as reconnect policy, ordering,
+  delivery guarantees, or offline behavior;
+- cache freshness, optimistic updates, pagination, or retry policy would change
+  user-visible data correctness;
+- the project already has multiple networking stacks and the intended target is
+  ambiguous.
+
+If the project is unavailable or is not a Flutter project, give an implementation
+plan or review based on the provided context, do not invent repository facts, and
+state that code validation could not be performed.
+
+## Resource Routing
+
+Read only the references and assets needed for the current task:
+
+| Need | Read | Use for |
+|---|---|---|
+| Basic HTTP CRUD or JSON models | [http-basics.md](references/http-basics.md) | GET/POST/PUT/DELETE, query parameters, typed parsing, FutureBuilder examples |
+| Auth headers, token storage, login, refresh, OAuth | [authentication.md](references/authentication.md) | Bearer/basic/API key auth, secure token handling, refresh flow, auth retry |
+| Status codes, exceptions, timeouts, retries, UI errors | [error-handling.md](references/error-handling.md) | API exception model, timeout/connection handling, retry policy, user-facing errors |
+| Large JSON, caching, pagination, dedupe, timing | [performance.md](references/performance.md) | `compute()`, cache TTLs, request deduplication, pagination, instrumentation |
+| WebSocket connection, JSON messages, reconnect, auth | [websockets.md](references/websockets.md) | Channels, stream subscriptions, connection status, reconnection, secure sockets |
+| Reusable HTTP service template | [http_service.dart](assets/code-templates/http_service.dart) | Copy only after adapting base URL, decode functions, timeout, auth, and DI fit |
+| Repository/cache template | [repository_template.dart](assets/code-templates/repository_template.dart) | Copy only when the app lacks an equivalent repository/cache boundary |
+| Standalone examples | [examples](assets/examples/) | Use as illustrative snippets, then adapt imports, state management, disposal, and errors |
+
+Every copied asset must be adapted to the target app's package name, lints,
+client stack, state-management style, and architecture before validation.
+
+## Networking Defaults
+
+- Use `http: ^1.6.0` and `web_socket_channel: ^3.0.3` only for new simple
+  clients. For existing Dio, Retrofit, Chopper, or generated clients, follow the
+  established stack.
+- Inject clients instead of constructing them deep inside services. Close owned
+  `http.Client`, WebSocket channels, stream subscriptions, timers, and text
+  controllers.
+- Treat `200..299` as success only when the endpoint contract allows it. Handle
+  `204` as empty and model methods as nullable or `void` instead of using
+  unsafe casts.
+- Decode JSON into typed models at service/repository boundaries. Use
+  background isolates for large responses, but avoid isolate overhead for small
+  payloads.
+- Add request timeouts and retry only transient failures. Do not retry unsafe
+  mutations unless the API is idempotent or the user confirms the product policy.
+- Store sensitive tokens with `flutter_secure_storage: ^10.0.0` or the app's
+  existing secure storage. Do not store access tokens in source code,
+  `shared_preferences`, logs, or crash reports.
+- Use `wss://` for WebSockets. Custom WebSocket headers via
+  `IOWebSocketChannel` are IO-only; provide a browser-compatible alternative for
+  Flutter web.
+- Do not manually set `Accept-Encoding` as a default with `package:http`; let the
+  platform/client negotiate compression unless the project has a measured need.
+
+## Validation
+
+Before finishing an implementation or review:
+
+1. Check that endpoint calls are behind testable services or repositories and
+   that UI code does not own raw HTTP/WebSocket details.
+2. Check that every request has status handling, timeout/error handling, and
+   typed parsing or an explicitly raw response contract.
+3. Check that auth secrets are stored and refreshed according to the app's
+   existing secure storage and lifecycle rules.
+4. Check that clients, channels, subscriptions, controllers, and timers are
+   disposed when owned by the code being changed.
+5. Run the closest available validation:
+   - `flutter analyze`
+   - focused `flutter test` suites for changed network/auth/repository code
+   - `dart format --output=none --set-exit-if-changed` for copied Dart assets
+   - this skill's `scripts/verify-examples.sh` when changing bundled examples or
+     templates
+6. Report commands run, failures, skipped checks, and residual networking risks.

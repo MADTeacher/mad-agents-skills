@@ -204,7 +204,7 @@ class CircularDetailScreen extends StatelessWidget {
                 width: 300,
                 height: 300,
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.8),
+                  color: Colors.blue.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(150),
                 ),
                 child: Center(

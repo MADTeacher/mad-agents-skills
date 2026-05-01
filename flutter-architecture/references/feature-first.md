@@ -207,23 +207,26 @@ shared/
 ### Within a Feature
 
 ```
-presentation/ → domain/ → data/
-      ↓          ↓
-    └─ shared/ui/
-              └─ shared/data/
+presentation/ -> domain/ -> data/
+presentation/ -> data/        // simple flows can skip domain
+presentation/ -> shared/ui/
+data/ -> shared/data/
 ```
 
-- **Presentation layer** can use Domain, Shared/UI
-- **Domain layer** can use Shared/Data
-- **Data layer** can use Shared/Data
+- **Presentation ViewModels** can use Domain, Data for simple flows, and
+  Shared/UI. Views should still talk to ViewModels, not Services.
+- **Domain layer** can use feature data abstractions and shared pure utilities.
+- **Data layer** can use Shared/Data services or models.
+- **Domain layer is optional**. Add use-cases only for complex, reused, or
+  multi-repository business logic.
 
 ### Between Features
 
-**Features should NOT depend on each other.**
+**Features should NOT import each other's implementation files.**
 
 If Feature A needs Feature B's functionality:
 1. Move common logic to `shared/`
-2. Use dependency injection (interfaces in domain)
+2. Use dependency injection with a stable interface
 3. Consider if features should be merged
 
 ```dart
@@ -233,8 +236,8 @@ import 'package:my_app/features/auth/data/repositories/auth_repository.dart';
 // ✅ GOOD: Using shared service
 import 'package:my_app/shared/data/services/auth_service.dart';
 
-// ✅ GOOD: Using domain interface
-import 'package:my_app/features/todos/domain/repositories/todo_repository.dart';
+// ✅ GOOD: Depending on a stable shared interface provided through DI
+import 'package:my_app/shared/data/auth_session.dart';
 ```
 
 ## When to Add a New Feature
@@ -243,7 +246,6 @@ import 'package:my_app/features/todos/domain/repositories/todo_repository.dart';
    ```
    features/new_feature/
    ├── data/
-   ├── domain/
    └── presentation/
    ```
 
@@ -310,8 +312,8 @@ GoRoute(
 
 Keep feature dependencies minimal:
 - Use `shared/` for common code
-- Avoid cross-feature imports
-- When needed, use dependency inversion
+- Avoid imports from another feature's `data/` or `presentation/`
+- When needed, use dependency inversion through an interface
 
 ### 4. Testing
 

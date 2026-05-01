@@ -59,12 +59,14 @@ class BackgroundParsingExample extends StatefulWidget {
 }
 
 class _BackgroundParsingExampleState extends State<BackgroundParsingExample> {
+  late final http.Client _client;
   late Future<List<Photo>> futurePhotos;
 
   @override
   void initState() {
     super.initState();
-    futurePhotos = fetchPhotos(http.Client());
+    _client = http.Client();
+    futurePhotos = fetchPhotos(_client);
   }
 
   @override
@@ -77,7 +79,7 @@ class _BackgroundParsingExampleState extends State<BackgroundParsingExample> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               setState(() {
-                futurePhotos = fetchPhotos(http.Client());
+                futurePhotos = fetchPhotos(_client);
               });
             },
           ),
@@ -121,5 +123,11 @@ class _BackgroundParsingExampleState extends State<BackgroundParsingExample> {
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _client.close();
+    super.dispose();
   }
 }

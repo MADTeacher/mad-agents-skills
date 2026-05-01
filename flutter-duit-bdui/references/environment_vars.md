@@ -1,53 +1,66 @@
-# Environment variables
+# Environment Variables
 
-This page describes compile-time environment variables used across DUIT packages and how to enable/disable them in different workflows.
+This reference covers compile-time DUIT flags. Use it only when the task asks
+to change unknown-widget behavior, warm-up, inlining, or focus-node override
+behavior.
 
-All variables below are compile-time constants resolved via bool.fromEnvironment, which means they are evaluated at build time and must be provided through the toolchain flags.
+All values are compile-time constants resolved through `bool.fromEnvironment`.
+Pass them with `--dart-define` to `flutter run`, `flutter build`, or
+`flutter test`.
 
-## Available variables
+## Available Variables
 
-1) `duit:throw-on-unspecified-widget-type`
-
-- Package: `flutter_duit`
-- Type: `bool` (compile-time)
-- Default: `true`
-- Purpose: When an unspecified/unknown widget type is encountered, throw `ArgumentError` (when `true`) instead of returning a fallback empty widget (when `false`). Useful during development to surface schema/model issues early.
-
-1) `duit:enable-warm-up`
-
-- Package: `duit_kernel`
-- Type: `bool` (compile-time)
-- Default: `false`
-- Purpose: Enables attribute warm-up routines. When enabled, the kernel may pre-initialize attribute-related structures to reduce first-use latency.
-
-1) `duit:prefer-inline`
-
-- Package: `duit_kernel`
-- Type: `bool` (compile-time)
-- Default: `true`
-- Purpose: Favors inline function strategies in the kernel where supported. Intended for advanced performance tuning and experimentation.
-
-1) `duit:allow-focus-node-override`
+1. `duit:throw-on-unspecified-widget-type`
 
 - Package: `flutter_duit`
-- Type: `bool` (compile-time)
+- Type: `bool`
+- Default: `true`
+- Purpose: when an unknown widget type is encountered, throw an error instead
+  of rendering a fallback empty widget. Keep this enabled in development unless
+  the user explicitly wants permissive fallback behavior.
+
+2. `duit:enable-warm-up`
+
+- Package: `duit_kernel`
+- Type: `bool`
 - Default: `false`
-- Purpose: Favors inline function strategies in the kernel where supported. Intended for advanced performance tuning and experimentation.
-- Назначение: Defines the behavior when binding a `FocusNode` to a driver if an attempt is made to bind a node with the same `nodeId` again.
+- Purpose: enables attribute warm-up routines that may reduce first-use latency.
 
-## How to set
+3. `duit:prefer-inline`
 
-These are compile-time flags and should be passed to the build/test commands.
+- Package: `duit_kernel`
+- Type: `bool`
+- Default: `true`
+- Purpose: favors inline function strategies where supported. Treat this as
+  advanced performance tuning.
 
-#### Flutter (run/build/test)
+4. `duit:allow-focus-node-override`
 
-Use `--dart-define` for Flutter CLI commands.
+- Package: `flutter_duit`
+- Type: `bool`
+- Default: `false`
+- Purpose: controls whether binding a `FocusNode` may override an existing node
+  with the same `nodeId`.
 
-Run the app:
+## Examples
 
 ```bash
-  flutter run -d macos \
+flutter run -d macos \
   --dart-define=duit:throw-on-unspecified-widget-type=false \
   --dart-define=duit:enable-warm-up=true \
   --dart-define=duit:prefer-inline=true
 ```
+
+```bash
+flutter test \
+  --dart-define=duit:throw-on-unspecified-widget-type=true
+```
+
+## Guardrails
+
+- Do not use runtime environment variables for these flags; they must be passed
+  through the Flutter/Dart toolchain.
+- When changing defaults in scripts or CI, update every relevant run/build/test
+  command.
+- Mention the chosen flag values in the final response when they affect
+  debugging or production behavior.

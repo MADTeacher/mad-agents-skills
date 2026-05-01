@@ -3,29 +3,53 @@ import 'package:flutter/material.dart';
 /// Example of responsive navigation that switches between
 /// NavigationBar (bottom) and NavigationRail (side)
 /// based on window width.
-class ResponsiveNavigationExample extends StatelessWidget {
+class ResponsiveNavigationExample extends StatefulWidget {
   const ResponsiveNavigationExample({super.key});
+
+  @override
+  State<ResponsiveNavigationExample> createState() =>
+      _ResponsiveNavigationExampleState();
+}
+
+class _ResponsiveNavigationExampleState
+    extends State<ResponsiveNavigationExample> {
+  static const _destinations = [
+    _AdaptiveDestination(Icons.home, 'Home'),
+    _AdaptiveDestination(Icons.search, 'Search'),
+    _AdaptiveDestination(Icons.person, 'Profile'),
+  ];
+
+  int _selectedIndex = 0;
+
+  void _selectDestination(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
-    return Scaffold(
-      body: width >= 600 ? _buildLargeLayout() : _buildSmallLayout(),
-    );
+    return width >= 600 ? _buildLargeLayout() : _buildSmallLayout();
   }
 
   /// Layout for small screens - bottom navigation
   Widget _buildSmallLayout() {
     return Scaffold(
+      appBar: AppBar(title: Text(_destinations[_selectedIndex].label)),
+      body: _DestinationBody(label: _destinations[_selectedIndex].label),
       bottomNavigationBar: NavigationBar(
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
-          NavigationDestination(icon: Icon(Icons.person), label: 'Profile'),
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _selectDestination,
+        destinations: [
+          for (final destination in _destinations)
+            NavigationDestination(
+              icon: Icon(destination.icon),
+              label: destination.label,
+            ),
         ],
       ),
-      body: const Center(child: Text('Small Layout')),
     );
   }
 
@@ -35,21 +59,40 @@ class ResponsiveNavigationExample extends StatelessWidget {
       body: Row(
         children: [
           NavigationRail(
-            destinations: const [
-              NavigationRailDestination(icon: Icon(Icons.home), label: 'Home'),
-              NavigationRailDestination(
-                icon: Icon(Icons.search),
-                label: 'Search',
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.person),
-                label: 'Profile',
-              ),
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: _selectDestination,
+            labelType: NavigationRailLabelType.all,
+            destinations: [
+              for (final destination in _destinations)
+                NavigationRailDestination(
+                  icon: Icon(destination.icon),
+                  label: Text(destination.label),
+                ),
             ],
           ),
-          const Expanded(child: Center(child: Text('Large Layout'))),
+          Expanded(
+            child: _DestinationBody(label: _destinations[_selectedIndex].label),
+          ),
         ],
       ),
     );
+  }
+}
+
+class _AdaptiveDestination {
+  const _AdaptiveDestination(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+}
+
+class _DestinationBody extends StatelessWidget {
+  const _DestinationBody({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Text(label));
   }
 }

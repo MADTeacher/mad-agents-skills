@@ -29,7 +29,8 @@ dev_dependencies:
 
 ### Create Test Driver
 
-Create `test_driver/integration_test.dart`:
+Create `test_driver/integration_test.dart` when using `flutter drive`, browser
+integration tests, screenshots, or response data from performance traces:
 
 ```dart
 import 'package:integration_test/integration_test_driver.dart';
@@ -65,13 +66,16 @@ void main() {
 flutter test integration_test/
 
 # Run on specific device
-flutter test -d <device-id> integration_test/
+flutter test -d <device-id> integration_test/my_test.dart
 
 # Run specific test file
 flutter test integration_test/my_test.dart
 
-# Run with driver
-flutter drive --target=integration_test/my_test.dart
+# Run a browser/driver integration test
+flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/my_test.dart \
+  -d chrome
 ```
 
 ## Testing User Flows
@@ -239,18 +243,21 @@ testWidgets('load more items on scroll', (tester) async {
 
 ## Testing State Persistence
 
-### SharedPreferences
+### Persisted Settings
 
 ```dart
-testWidgets('user preference persists across restarts', (tester) async {
-  await tester.pumpWidget(const MyApp());
+testWidgets('user preference persists across app rebuild', (tester) async {
+  final preferences = FakePreferencesStore();
+
+  await tester.pumpWidget(MyApp(preferences: preferences));
   
   // Change setting
   await tester.tap(find.text('Dark Mode'));
   await tester.pumpAndSettle();
   
-  // Restart app
-  await tester.pumpWidget(const MyApp());
+  // Rebuild the app with the same injected storage.
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpWidget(MyApp(preferences: preferences));
   await tester.pumpAndSettle();
   
   // Verify setting persisted
@@ -263,7 +270,9 @@ testWidgets('user preference persists across restarts', (tester) async {
 
 ```dart
 testWidgets('user stays logged in', (tester) async {
-  await tester.pumpWidget(const MyApp());
+  final authStore = FakeAuthStore();
+
+  await tester.pumpWidget(MyApp(authStore: authStore));
   
   // Login
   await tester.enterText(find.byKey(const Key('email')), 'user@example.com');
@@ -273,8 +282,9 @@ testWidgets('user stays logged in', (tester) async {
   
   expect(find.text('Dashboard'), findsOneWidget);
   
-  // Restart app
-  await tester.pumpWidget(const MyApp());
+  // Rebuild the app with the same injected auth store.
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpWidget(MyApp(authStore: authStore));
   await tester.pumpAndSettle();
   
   // Still logged in
@@ -289,24 +299,20 @@ testWidgets('user stays logged in', (tester) async {
 
 ```dart
 testWidgets('measure scrolling performance', (tester) async {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized()
+      as IntegrationTestWidgetsFlutterBinding;
+
   await tester.pumpWidget(const MyApp());
   await tester.pumpAndSettle();
   
-  final timeline = await tester.trace(() async {
+  await binding.watchPerformance(() async {
     await tester.fling(
       find.byType(ListView),
       const Offset(0, -1000),
       5000,
     );
     await tester.pumpAndSettle();
-  });
-  
-  // Analyze frame times
-  final frameTimings = timeline.frames.map((frame) => frame.duration).toList();
-  final averageFrameTime = frameTimings.reduce((a, b) => a + b) / frameTimings.length;
-  
-  // Should run at 60fps (16.67ms per frame max)
-  expect(averageFrameTime.inMilliseconds, lessThan(17));
+  }, reportKey: 'scrolling_performance');
 });
 ```
 
@@ -338,9 +344,11 @@ testWidgets('widget doesn't rebuild unnecessarily', (tester) async {
 });
 ```
 
-### Memory Tracking
+### Memory Tracking on Native Targets
 
 ```dart
+import 'dart:io' show ProcessInfo;
+
 testWidgets('monitor memory usage during scrolling', (tester) async {
   await tester.pumpWidget(const MyApp());
   
@@ -367,13 +375,14 @@ testWidgets('monitor memory usage during scrolling', (tester) async {
 
 ```dart
 testWidgets('request and handle camera permission', (tester) async {
-  await tester.pumpWidget(const MyApp());
+  final permissions = FakePermissionGateway(
+    camera: PermissionStatus.granted,
+  );
+
+  await tester.pumpWidget(MyApp(permissions: permissions));
   
   // Request camera access
   await tester.tap(find.text('Take Photo'));
-  await tester.pumpAndSettle();
-  
-  // Handle permission dialog (platform-specific)
   await tester.pumpAndSettle();
   
   // Verify camera screen appears
@@ -415,16 +424,19 @@ testWidgets('complete purchase flow', (tester) async {
 
 ```dart
 testWidgets('handle offline state gracefully', (tester) async {
-  await tester.pumpWidget(const MyApp());
+  final connectivity = FakeConnectivity(isOnline: false);
+  final api = FakeApiClient(networkError: const SocketException('offline'));
   
-  // Simulate offline
-  await tester.binding.setSurfaceSize(Size.zero);
+  await tester.pumpWidget(MyApp(connectivity: connectivity, apiClient: api));
+  await tester.pumpAndSettle();
   
   // Verify offline message
   expect(find.text('No internet connection'), findsOneWidget);
   
   // Simulate back online
-  await tester.binding.setSurfaceSize(const Size(400, 800));
+  connectivity.isOnline = true;
+  api.networkError = null;
+  await tester.tap(find.byKey(const Key('retry-button')));
   await tester.pumpAndSettle();
   
   // Reload data
@@ -454,19 +466,15 @@ testWidgets('handle network errors', (tester) async {
 
 ```dart
 testWidgets('animation runs smoothly', (tester) async {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized()
+      as IntegrationTestWidgetsFlutterBinding;
+
   await tester.pumpWidget(const MyApp());
   
-  final timeline = await tester.trace(() async {
+  await binding.traceAction(() async {
     await tester.tap(find.byKey(const Key('animate')));
     await tester.pumpAndSettle();
-  });
-  
-  // Check for janky frames
-  final jankyFrames = timeline.frames.where((frame) => 
-    frame.duration.inMicroseconds > 16667 // 60fps threshold
-  );
-  
-  expect(jankyFrames.length, lessThan(timeline.frames.length ~/ 10));
+  }, reportKey: 'animation_timeline');
 });
 ```
 
@@ -487,17 +495,22 @@ testWidgets('animation runs smoothly', (tester) async {
 
 ```dart
 testWidgets('debug test with screenshot', (tester) async {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized()
+      as IntegrationTestWidgetsFlutterBinding;
+
   await tester.pumpWidget(const MyApp());
   
-  // Take screenshot
-  await tester.takeScreenshot('test-screenshot');
+  // On Android, call convertFlutterSurfaceToImage and pump before screenshots.
+  await binding.convertFlutterSurfaceToImage();
+  await tester.pump();
+  await binding.takeScreenshot('test-screenshot');
   
   // Perform actions
   await tester.tap(find.text('Button'));
   await tester.pumpAndSettle();
   
   // Take another screenshot
-  await tester.takeScreenshot('after-tap');
+  await binding.takeScreenshot('after-tap');
 });
 ```
 

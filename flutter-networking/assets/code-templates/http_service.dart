@@ -1,143 +1,264 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
+
+typedef JsonDecoder<T> = T Function(Object? json);
+typedef HeadersProvider = FutureOr<Map<String, String>> Function();
 
 class ApiService {
   final http.Client _client;
   final String _baseUrl;
-  final String? _authToken;
+  final Duration _timeout;
+  final HeadersProvider? _headersProvider;
+  final bool _ownsClient;
 
-  ApiService({required String baseUrl, String? authToken, http.Client? client})
-    : _baseUrl = baseUrl,
-      _authToken = authToken,
-      _client = client ?? http.Client();
+  ApiService({
+    required String baseUrl,
+    http.Client? client,
+    Duration timeout = const Duration(seconds: 15),
+    HeadersProvider? headersProvider,
+  }) : _baseUrl = baseUrl,
+       _client = client ?? http.Client(),
+       _timeout = timeout,
+       _headersProvider = headersProvider,
+       _ownsClient = client == null;
 
-  Map<String, String> get _headers {
-    final headers = <String, String>{'Content-Type': 'application/json'};
-
-    if (_authToken != null) {
-      headers['Authorization'] = 'Bearer $_authToken';
-    }
-
-    return headers;
-  }
-
-  Future<T> _get<T>(
+  Future<T?> getJson<T>(
     String path, {
-    Map<String, dynamic>? queryParameters,
+    Map<String, String>? queryParameters,
+    Map<String, String>? headers,
+    required JsonDecoder<T> decode,
+  }) {
+    return _sendJson(
+      'GET',
+      path,
+      queryParameters: queryParameters,
+      headers: headers,
+      decode: decode,
+    );
+  }
+
+  Future<T?> postJson<T>(
+    String path, {
+    Object? body,
+    Map<String, String>? queryParameters,
+    Map<String, String>? headers,
+    required JsonDecoder<T> decode,
+  }) {
+    return _sendJson(
+      'POST',
+      path,
+      queryParameters: queryParameters,
+      headers: headers,
+      body: body,
+      decode: decode,
+    );
+  }
+
+  Future<T?> putJson<T>(
+    String path, {
+    Object? body,
+    Map<String, String>? queryParameters,
+    Map<String, String>? headers,
+    required JsonDecoder<T> decode,
+  }) {
+    return _sendJson(
+      'PUT',
+      path,
+      queryParameters: queryParameters,
+      headers: headers,
+      body: body,
+      decode: decode,
+    );
+  }
+
+  Future<T?> deleteJson<T>(
+    String path, {
+    Map<String, String>? queryParameters,
+    Map<String, String>? headers,
+    JsonDecoder<T>? decode,
+  }) {
+    return _sendJson(
+      'DELETE',
+      path,
+      queryParameters: queryParameters,
+      headers: headers,
+      decode: decode,
+    );
+  }
+
+  Future<T?> _sendJson<T>(
+    String method,
+    String path, {
+    Map<String, String>? queryParameters,
+    Map<String, String>? headers,
+    Object? body,
+    JsonDecoder<T>? decode,
   }) async {
-    final uri = Uri.parse(
-      '$_baseUrl$path',
-    ).replace(queryParameters: queryParameters);
+    final uri = _uri(path, queryParameters);
+    final requestHeaders = await _headers(headers, hasBody: body != null);
+    final encodedBody = body == null ? null : jsonEncode(body);
 
-    final response = await _client.get(uri, headers: _headers);
-    return _handleResponse<T>(response);
-  }
+    try {
+      final response = await switch (method) {
+        'GET' => _client.get(uri, headers: requestHeaders),
+        'POST' => _client.post(uri, headers: requestHeaders, body: encodedBody),
+        'PUT' => _client.put(uri, headers: requestHeaders, body: encodedBody),
+        'DELETE' => _client.delete(uri, headers: requestHeaders),
+        _ => throw ArgumentError.value(method, 'method', 'Unsupported method'),
+      }.timeout(_timeout);
 
-  Future<T> _post<T>(String path, {Map<String, dynamic>? body}) async {
-    final uri = Uri.parse('$_baseUrl$path');
-
-    final response = await _client.post(
-      uri,
-      headers: _headers,
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return _handleResponse<T>(response);
-  }
-
-  Future<T> _put<T>(String path, {Map<String, dynamic>? body}) async {
-    final uri = Uri.parse('$_baseUrl$path');
-
-    final response = await _client.put(
-      uri,
-      headers: _headers,
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return _handleResponse<T>(response);
-  }
-
-  Future<T> _delete<T>(String path) async {
-    final uri = Uri.parse('$_baseUrl$path');
-
-    final response = await _client.delete(uri, headers: _headers);
-    return _handleResponse<T>(response);
-  }
-
-  T _handleResponse<T>(http.Response response) {
-    switch (response.statusCode) {
-      case 200:
-      case 201:
-      case 204:
-        if (response.body.isEmpty) {
-          return null as T;
-        }
-        return jsonDecode(response.body) as T;
-
-      case 400:
-        throw BadRequestException('Invalid request');
-
-      case 401:
-        throw UnauthorizedException('Not authenticated');
-
-      case 403:
-        throw ForbiddenException('Access denied');
-
-      case 404:
-        throw NotFoundException('Resource not found');
-
-      case 429:
-        throw TooManyRequestsException('Rate limit exceeded');
-
-      case 500:
-      case 502:
-      case 503:
-        throw ServerException('Server error');
-
-      default:
-        throw HttpException(
-          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
-        );
+      return _handleResponse(response, decode);
+    } on TimeoutException catch (error) {
+      throw ApiTimeoutException(
+        'Request timed out after ${_timeout.inSeconds}s',
+        cause: error,
+      );
+    } on http.ClientException catch (error) {
+      throw ApiNetworkException(error.message, cause: error);
     }
+  }
+
+  Uri _uri(String path, Map<String, String>? queryParameters) {
+    final base = _baseUrl.endsWith('/')
+        ? _baseUrl.substring(0, _baseUrl.length - 1)
+        : _baseUrl;
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+
+    return Uri.parse(
+      '$base$normalizedPath',
+    ).replace(queryParameters: queryParameters);
+  }
+
+  Future<Map<String, String>> _headers(
+    Map<String, String>? extra, {
+    required bool hasBody,
+  }) async {
+    final provided = await _headersProvider?.call();
+    return {
+      'Accept': 'application/json',
+      if (hasBody && _extraBodyNeedsJson(extra))
+        'Content-Type': 'application/json',
+      ...?provided,
+      ...?extra,
+    };
+  }
+
+  bool _extraBodyNeedsJson(Map<String, String>? extra) {
+    return extra == null ||
+        !extra.keys.any((key) => key.toLowerCase() == 'content-type');
+  }
+
+  T? _handleResponse<T>(http.Response response, JsonDecoder<T>? decode) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.isEmpty) {
+        return null;
+      }
+      if (decode == null) {
+        throw ApiDecodeException('No decoder supplied for non-empty response');
+      }
+
+      return decode(jsonDecode(response.body));
+    }
+
+    throw ApiHttpException.fromResponse(response);
   }
 
   void dispose() {
-    _client.close();
+    if (_ownsClient) {
+      _client.close();
+    }
   }
 }
 
-class BadRequestException implements Exception {
+class ApiException implements Exception {
   final String message;
-  BadRequestException(this.message);
+  final int? statusCode;
+  final String? responseBody;
+  final Object? cause;
+
+  const ApiException(
+    this.message, {
+    this.statusCode,
+    this.responseBody,
+    this.cause,
+  });
+
+  @override
+  String toString() {
+    final code = statusCode == null ? '' : ' ($statusCode)';
+    return '$runtimeType$code: $message';
+  }
 }
 
-class UnauthorizedException implements Exception {
-  final String message;
-  UnauthorizedException(this.message);
+class ApiHttpException extends ApiException {
+  const ApiHttpException(
+    super.message, {
+    required super.statusCode,
+    super.responseBody,
+  });
+
+  factory ApiHttpException.fromResponse(http.Response response) {
+    final message = response.reasonPhrase ?? 'HTTP ${response.statusCode}';
+    return switch (response.statusCode) {
+      400 => BadRequestException(message, response.body),
+      401 => UnauthorizedException(message, response.body),
+      403 => ForbiddenException(message, response.body),
+      404 => NotFoundException(message, response.body),
+      429 => TooManyRequestsException(message, response.body),
+      >= 500 && < 600 => ServerException(
+        message,
+        response.statusCode,
+        response.body,
+      ),
+      _ => ApiHttpException(
+        message,
+        statusCode: response.statusCode,
+        responseBody: response.body,
+      ),
+    };
+  }
 }
 
-class ForbiddenException implements Exception {
-  final String message;
-  ForbiddenException(this.message);
+class BadRequestException extends ApiHttpException {
+  const BadRequestException(super.message, String responseBody)
+    : super(statusCode: 400, responseBody: responseBody);
 }
 
-class NotFoundException implements Exception {
-  final String message;
-  NotFoundException(this.message);
+class UnauthorizedException extends ApiHttpException {
+  const UnauthorizedException(super.message, String responseBody)
+    : super(statusCode: 401, responseBody: responseBody);
 }
 
-class TooManyRequestsException implements Exception {
-  final String message;
-  TooManyRequestsException(this.message);
+class ForbiddenException extends ApiHttpException {
+  const ForbiddenException(super.message, String responseBody)
+    : super(statusCode: 403, responseBody: responseBody);
 }
 
-class ServerException implements Exception {
-  final String message;
-  ServerException(this.message);
+class NotFoundException extends ApiHttpException {
+  const NotFoundException(super.message, String responseBody)
+    : super(statusCode: 404, responseBody: responseBody);
 }
 
-class HttpException implements Exception {
-  final String message;
-  HttpException(this.message);
+class TooManyRequestsException extends ApiHttpException {
+  const TooManyRequestsException(super.message, String responseBody)
+    : super(statusCode: 429, responseBody: responseBody);
+}
+
+class ServerException extends ApiHttpException {
+  const ServerException(super.message, int statusCode, String responseBody)
+    : super(statusCode: statusCode, responseBody: responseBody);
+}
+
+class ApiNetworkException extends ApiException {
+  const ApiNetworkException(super.message, {super.cause});
+}
+
+class ApiTimeoutException extends ApiException {
+  const ApiTimeoutException(super.message, {super.cause});
+}
+
+class ApiDecodeException extends ApiException {
+  const ApiDecodeException(super.message, {super.cause});
 }

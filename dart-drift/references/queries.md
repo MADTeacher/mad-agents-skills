@@ -1,290 +1,197 @@
 ---
 title: Queries
-description: SELECT queries in drift
+description: SELECT queries in Drift
 ---
+
+# Queries
+
+Use this reference for Drift SELECTs, filters, ordering, joins, aggregates, and
+custom SQL reads.
 
 ## Basic Select
 
-Get all rows from a table:
-
 ```dart
-final allTodos = await select(todoItems).get();
+final allTodos = await db.select(db.todoItems).get();
+final todoStream = db.select(db.todoItems).watch();
 ```
 
-Turn into stream:
+## Where
 
 ```dart
-final allTodosStream = select(todoItems).watch();
+final completedTodos = await (db.select(db.todoItems)
+      ..where((t) => t.isCompleted.equals(true)))
+    .get();
 ```
 
-## Where Clause
-
-Filter results with where:
+Combine expressions with `&` and `|`:
 
 ```dart
-final completedTodos = await (select(todoItems)
-  ..where((t) => t.isCompleted.equals(true))
-  ).get();
+final importantOpenTodos = await (db.select(db.todoItems)
+      ..where(
+        (t) => t.isCompleted.equals(false) & t.priority.isBiggerThanValue(3),
+      ))
+    .get();
 ```
 
-Multiple conditions:
+Common operators:
+
+- `equals(value)`
+- `isBiggerThanValue(value)`
+- `isBiggerOrEqualValue(value)`
+- `isSmallerThanValue(value)`
+- `isSmallerOrEqualValue(value)`
+- `like(pattern)`
+- `contains(value)` for text contains
+- `isNull()` and `isNotNull()`
+
+## Limit and Order
 
 ```dart
-final filteredTodos = await (select(todoItems)
-  ..where((t) => t.isCompleted.equals(true) & t.priority.isBiggerThanValue(3))
-  ).get();
-```
-
-Operators:
-- `equals(value)` - equals
-- `isBiggerThan(value)` - greater than
-- `isSmallerThan(value)` - less than
-- `isBiggerOrEqualValue(value)` - greater or equal
-- `isSmallerOrEqualValue(value)` - less or equal
-- `like(pattern)` - LIKE operator
-- `contains(value)` - contains text
-- `isNull()` - IS NULL
-- `isNotNull()` - IS NOT NULL
-
-## Limit and Offset
-
-```dart
-final pageOfTodos = await (select(todoItems)
-  ..limit(20, offset: 40)
-  ).get();
-```
-
-## Order By
-
-```dart
-final sortedTodos = await (select(todoItems)
-  ..orderBy([(t) => OrderingTerm(expression: t.createdAt)])
-  ).get();
-```
-
-Descending order:
-
-```dart
-final sortedTodosDesc = await (select(todoItems)
-  ..orderBy([
-    (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
-  ])
-  ).get();
+final page = await (db.select(db.todoItems)
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+      ..limit(20, offset: 40))
+    .get();
 ```
 
 ## Single Row
 
-Get exactly one row:
-
 ```dart
-final todo = await (select(todoItems)
-  ..where((t) => t.id.equals(1))
-  ).getSingle();
+final todo = await (db.select(db.todoItems)
+      ..where((t) => t.id.equals(id)))
+    .getSingle();
 ```
 
-Watch single row as stream:
-
 ```dart
-final todoStream = (select(todoItems)
-  ..where((t) => t.id.equals(1))
-  ).watchSingle();
+final maybeTodo = await (db.select(db.todoItems)
+      ..where((t) => t.id.equals(id)))
+    .getSingleOrNull();
 ```
 
-Allow null result:
+Use `watchSingle()` and `watchSingleOrNull()` for reactive single-row streams.
+
+## Mapping Rows
 
 ```dart
-final todo = await (select(todoItems)
-  ..where((t) => t.id.equals(1))
-  ).getSingleOrNull();
-```
-
-## Mapping
-
-Transform results:
-
-```dart
-final titles = await (select(todoItems)
-  ..where((t) => t.title.length.isBiggerOrEqualValue(10))
-  .map((row) => row.title)
-  ).get();
+final titles = await (db.select(db.todoItems)
+      ..where((t) => t.title.length.isBiggerOrEqualValue(10)))
+    .map((row) => row.title)
+    .get();
 ```
 
 ## Joins
 
-### Inner Join
-
 ```dart
-class EntryWithCategory {
-  EntryWithCategory(this.entry, this.category);
-  final TodoItem entry;
+class TodoWithCategory {
+  TodoWithCategory({required this.todo, required this.category});
+
+  final TodoItem todo;
   final Category? category;
 }
 
-final results = await (select(todoItems)
-  .join([
-    innerJoin(categories, categories.id.equalsExp(todoItems.category)),
-  ])
-  .map((row) => EntryWithCategory(
-    row.readTable(todoItems),
-    row.readTableOrNull(categories),
-  ))
-  .get();
+final rows = await db.select(db.todoItems).join([
+  leftOuterJoin(
+    db.categories,
+    db.categories.id.equalsExp(db.todoItems.categoryId),
+  ),
+]).map((row) {
+  return TodoWithCategory(
+    todo: row.readTable(db.todoItems),
+    category: row.readTableOrNull(db.categories),
+  );
+}).get();
 ```
 
-### Left Outer Join
+For self-joins, alias the table:
 
 ```dart
-final results = await (select(todoItems)
-  .join([
-    leftOuterJoin(categories, categories.id.equalsExp(todoItems.category)),
-  ])
-  .map((row) => EntryWithCategory(
-    row.readTable(todoItems),
-    row.readTableOrNull(categories),
-  ))
-  .get();
+final otherTodos = alias(db.todoItems, 'other_todos');
+
+final related = await db.select(otherTodos).join([
+  innerJoin(
+    db.todoItems,
+    db.todoItems.categoryId.equalsExp(otherTodos.categoryId),
+    useColumns: false,
+  ),
+]).map((row) => row.readTable(otherTodos)).get();
 ```
 
-### Multiple Joins
+## Aggregates
+
+Count all rows:
 
 ```dart
-final results = await (select(todoItems)
-  .join([
-    innerJoin(categories, categories.id.equalsExp(todoItems.category)),
-    innerJoin(users, users.id.equalsExp(todoItems.userId)),
-  ])
-  .get();
+final countExp = db.todoItems.id.count();
+
+final count = await (db.selectOnly(db.todoItems)..addColumns([countExp]))
+    .map((row) => row.read(countExp) ?? 0)
+    .getSingle();
 ```
 
-### Self Join
-
-Join table to itself:
+Group by a column:
 
 ```dart
-final otherTodos = alias(todoItems, 'other');
+final category = db.todoItems.categoryId;
+final countExp = db.todoItems.id.count();
 
-final results = await (select(otherTodos)
-  .join([
-    innerJoin(
-      categories,
-      categories.id.equalsExp(otherTodos.category),
-      useColumns: false,
-    ),
-    innerJoin(
-      todoItems,
-      todoItems.category.equalsExp(categories.id),
-      useColumns: false,
-    ),
-  ])
-  .where(todoItems.title.contains('important'))
-  .map((row) => row.readTable(otherTodos))
-  .get();
+final counts = await (db.selectOnly(db.todoItems)
+      ..addColumns([category, countExp])
+      ..groupBy([category]))
+    .map((row) {
+  return (
+    categoryId: row.read(category),
+    count: row.read(countExp) ?? 0,
+  );
+}).get();
 ```
 
-## Aggregations
-
-### Count
+Average:
 
 ```dart
-final count = await (selectOnly(todoItems)
-  .addColumns([countAll()])
-  .map((row) => row.read(countAll()))
-  .getSingle();
-```
+final avgExp = db.todoItems.priority.avg();
 
-### Count by Group
-
-```dart
-final countPerCategory = await (select(categories)
-  .join([
-    innerJoin(
-      todoItems,
-      todoItems.category.equalsExp(categories.id),
-      useColumns: false,
-    ),
-  ])
-  ..addColumns([todoItems.id.count()])
-  ..groupBy([categories.id])
-  .map((row) => (
-    category: row.readTable(categories),
-    count: row.read(todoItems.id.count())!,
-  ))
-  .get();
-```
-
-### Average
-
-```dart
-final avgLength = await (selectOnly(todoItems)
-  .addColumns([todoItems.title.length.avg()])
-  .map((row) => row.read(todoItems.title.length.avg())!)
-  .getSingle();
-```
-
-## Subqueries
-
-### In Where Clause
-
-```dart
-final latestTodos = await (select(todoItems)
-  ..where((t) => t.createdAt.isBiggerThan(
-    subqueryExpression(
-      selectOnly(todoItems)
-        .addColumns([max(todoItems.createdAt)])
-        .where((t) => t.userId.equals(currentUserId)),
-    ),
-  ))
-  .get();
-```
-
-### From Subquery
-
-```dart
-final sub = Subquery(
-  select(todoItems)
-    ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
-    ..limit(10),
-  's',
-);
-
-final results = await select(sub).get();
+final averagePriority = await (db.selectOnly(db.todoItems)..addColumns([avgExp]))
+    .map((row) => row.read(avgExp))
+    .getSingle();
 ```
 
 ## Custom Columns
 
-Add computed column to results:
-
 ```dart
-final isImportant = todoItems.content.like('%important%');
+final isImportant = db.todoItems.title.like('%important%');
 
-final results = await select(todoItems)
-  .addColumns([isImportant])
-  .map((row) => (
-    todo: row.readTable(todoItems),
-    important: row.read(isImportant)!,
-  ))
-  .get();
+final rows = await (db.select(db.todoItems)..addColumns([isImportant]))
+    .map((row) {
+  return (
+    todo: row.readTable(db.todoItems),
+    important: row.read(isImportant) ?? false,
+  );
+}).get();
 ```
 
 ## Exists
 
 ```dart
-final hasTodo = await (selectOnly(todoItems)
-  .addColumns([existsQuery(select(todoItems))])
-  .map((row) => row.read(existsQuery(select(todoItems)))!)
-  .getSingle();
+final existsExp = existsQuery(
+  db.select(db.todoItems)..where((t) => t.id.equals(id)),
+);
+
+final exists = await (db.selectOnly(db.todoItems)..addColumns([existsExp]))
+    .map((row) => row.read(existsExp) ?? false)
+    .getSingle();
 ```
 
-## Union
+## Custom SQL Reads
 
-Combine results from multiple queries:
+Use `customSelect` when the query builder does not expose a database-specific
+feature. Always pass variables separately and declare `readsFrom` for streams:
 
 ```dart
-final query1 = select(todoItems)
-  ..where((t) => t.isCompleted.equals(true));
-
-final query2 = select(todoItems)
-  ..where((t) => t.priority.equals(1));
-
-final results = await query1.unionAll(query2).get();
+final rows = await db.customSelect(
+  'SELECT * FROM todo_items WHERE title LIKE ?',
+  variables: [Variable.withString('%drift%')],
+  readsFrom: {db.todoItems},
+).get();
 ```
+
+For PostgreSQL-specific SQL, prefer `customSelect` over inventing unsupported
+expression APIs.

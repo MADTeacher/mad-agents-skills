@@ -427,12 +427,19 @@ testWidgets('handle empty list', (tester) async {
 flutter test --verbose
 ```
 
-### Take Screenshots
+### Take Screenshots in Integration Tests
 
 ```dart
+import 'package:integration_test/integration_test.dart';
+
 testWidgets('debug with screenshot', (tester) async {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized()
+      as IntegrationTestWidgetsFlutterBinding;
+
   await tester.pumpWidget(MyWidget());
-  await tester.takeScreenshot('debug-state');
+  await binding.convertFlutterSurfaceToImage();
+  await tester.pump();
+  await binding.takeScreenshot('debug-state');
 });
 ```
 

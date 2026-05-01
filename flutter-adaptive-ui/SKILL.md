@@ -1,273 +1,74 @@
 ---
 name: flutter-adaptive-ui
-description: Build adaptive and responsive Flutter UIs that work beautifully across all platforms and screen sizes. Use when creating Flutter apps that need to adapt layouts based on screen size, support multiple platforms including mobile tablet desktop and web, handle different input devices like touch mouse and keyboard, implement responsive navigation patterns, optimize for large screens and foldables, or use Capability and Policy patterns for platform-specific behavior.
+description: Build, fix, review, and validate adaptive or responsive Flutter UIs for mobile, tablet, desktop, web, large screens, foldables, and mixed input devices. Use when creating breakpoint-driven layouts, responsive navigation, adaptive dialogs/lists/grids, keyboard/mouse/touch behavior, window-size decisions with MediaQuery or LayoutBuilder, or Capability and Policy patterns for platform-specific behavior.
 metadata:
   author: Stanislav [MADTeacher] Chernyshev
-  version: "1.0"
+  version: "2.0"
 ---
 
 # Flutter Adaptive UI
 
-## Overview
+You are a Flutter adaptive UI implementation agent. Your job is to make the UI work from narrow mobile windows to expanded desktop/web layouts without guessing from device type.
 
-Create Flutter applications that adapt gracefully to any screen size, platform, or input device. This skill provides comprehensive guidance for building responsive layouts that scale from mobile phones to large desktop displays while maintaining excellent user experience across touch, mouse, and keyboard interactions.
+## Principle 0
 
-## Quick Reference
+Adaptive Flutter UI is based on available constraints, not platform labels. Use window or parent constraints for layout decisions, keep touch usable first, and add mouse, keyboard, and platform behavior as explicit branches that can be tested.
 
-**Core Layout Rule:** Constraints go down. Sizes go up. Parent sets position.
+Core rule: constraints go down, sizes go up, parent sets position.
 
-**3-Step Adaptive Approach:**
-1. **Abstract** - Extract common data from widgets
-2. **Measure** - Determine available space (MediaQuery/LayoutBuilder)
-3. **Branch** - Select appropriate UI based on breakpoints
+Default breakpoints:
 
-**Key Breakpoints:**
-* Compact (Mobile): width < 600
-* Medium (Tablet): 600 <= width < 840  
-* Expanded (Desktop): width >= 840
+- Compact: width < 600
+- Medium: 600 <= width < 840
+- Expanded: width >= 840
 
-## Adaptive Workflow
+## Workflow
 
-Follow the 3-step approach to make your app adaptive.
+1. Identify the user flow, target form factors, supported platforms, and the expensive failure mode: overflow, unreadable wide content, lost state, inaccessible keyboard flow, or wrong platform behavior.
+2. Inspect existing widgets before changing layout. Find navigation, dialogs, lists, grids, fixed widths/heights, orientation checks, `Platform.*` layout checks, and custom input/focus handling.
+3. Abstract shared data before branching. For example, create one destination model used by both `NavigationBar` and `NavigationRail`.
+4. Measure the right space:
+   - Use `MediaQuery.sizeOf(context)` for app-level or page-level window decisions.
+   - Use `LayoutBuilder` when the branch depends on the parent constraints of a widget subtree.
+5. Branch by breakpoints or capabilities, not by device type. Use compact/medium/expanded layouts for space changes; use Capability and Policy objects for what the app can do or should do.
+6. Implement the smallest adaptive change that preserves state. Keep scroll position, selected navigation destination, form input, and focus stable across resize/orientation/fold changes.
+7. Validate on at least compact and expanded widths. Include medium width when the implementation has a distinct tablet layout.
 
-### Step 1: Abstract
+## Resource Routing
 
-Identify widgets that need adaptability and extract common data. Common patterns:
-- Navigation UI (switch between bottom bar and side rail)
-- Dialogs (fullscreen on mobile, modal on desktop)
-- Content lists (reflow from single to multi-column)
+| Task | Read/use | Purpose |
+|---|---|---|
+| Need the full adaptive design process | [adaptive-workflow.md](references/adaptive-workflow.md) | Abstract, measure, branch workflow and breakpoint choice |
+| Need constraints or overflow diagnosis | [layout-constraints.md](references/layout-constraints.md) | Flutter layout rules and edge cases |
+| Need basic layout widget guidance | [layout-basics.md](references/layout-basics.md) | Rows, columns, alignment, sizing, and composition |
+| Need common layout widget behavior | [layout-common-widgets.md](references/layout-common-widgets.md) | Container, GridView, ListView, Stack, Card, ListTile |
+| Need adaptive UX guardrails | [adaptive-best-practices.md](references/adaptive-best-practices.md) | Orientation, width, inputs, state, and performance guidance |
+| Need platform behavior branching | [adaptive-capabilities.md](references/adaptive-capabilities.md) | Capability and Policy structure |
+| Need responsive navigation starter code | [responsive_navigation.dart](assets/responsive_navigation.dart) | Copy only after fitting destinations and selected state to the target app |
+| Need Capability/Policy starter code | [capability_policy_example.dart](assets/capability_policy_example.dart) | Copy only after replacing placeholder behavior with real app services |
 
-For navigation, create a shared `Destination` class with icon and label used by both `NavigationBar` and `NavigationRail`.
+Do not read every reference by default. Read only the routed material needed for the current failure mode or implementation path.
 
-### Step 2: Measure
+## Implementation Rules
 
-Choose the right measurement tool:
+- Treat Dart snippets in `references/` as explanatory fragments unless the reference explicitly says otherwise. Use `assets/` for starter code.
+- Do not use `Platform.isIOS`, `Platform.isAndroid`, device names, or `OrientationBuilder` for layout decisions. Use available width/constraints instead.
+- Do not let large screens stretch text fields, cards, lists, or reading content across the full window without a deliberate max width or multi-column layout.
+- Start with a solid touch interaction, then add hover, shortcuts, focus traversal, and keyboard activation as accelerators.
+- Use `GridView.extent`, adaptive flex layouts, or constrained content widths for expanded layouts instead of duplicating whole screens when a local reflow is enough.
+- Keep Capability methods about what is possible and Policy methods about what should be shown or allowed. Name methods by the decision, not by the platform.
+- Treat bundled assets as starter examples. They are copy-ready only after `flutter analyze` passes in the target project or a scratch Flutter project.
 
-**MediaQuery.sizeOf(context)** - Use when you need app window size for top-level layout decisions
-- Returns entire app window dimensions
-- Better performance than `MediaQuery.of()` for size queries
-- Rebuilds widget when window size changes
+## Validation
 
-**LayoutBuilder** - Use when you need constraints for specific widget subtree
-- Provides parent widget's constraints as `BoxConstraints`
-- Local sizing information, not global window size
-- Returns min/max width and height ranges
+After changing a Flutter project:
 
-Example:
-```dart
-// For app-level decisions
-final width = MediaQuery.sizeOf(context).width;
+1. Run `flutter analyze`.
+2. Run relevant widget tests when layout branching, navigation state, focus, or policy/capability behavior changed.
+3. Manually or automatically check narrow (<600), medium (600-839 when used), and expanded (>=840) widths.
+4. Verify no new overflow stripes, clipped text, lost selected state, lost scroll position, or broken keyboard traversal.
+5. If validation cannot run, report the blocker and the risk. Do not present an adaptive UI change as verified without a width check or analysis result.
 
-// For widget-specific constraints
-LayoutBuilder(
-  builder: (context, constraints) {
-    if (constraints.maxWidth < 600) {
-      return MobileLayout();
-    }
-    return DesktopLayout();
-  },
-)
-```
+## Fallback
 
-### Step 3: Branch
-
-Apply breakpoints to select appropriate UI. Don't base decisions on device type - use window size instead.
-
-Example breakpoints (from Material guidelines):
-```dart
-class AdaptiveLayout extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    
-    if (width >= 840) {
-      return DesktopLayout();
-    } else if (width >= 600) {
-      return TabletLayout();
-    }
-    return MobileLayout();
-  }
-}
-```
-
-## Layout Fundamentals
-
-### Understanding Constraints
-
-Flutter layout follows one rule: **Constraints go down. Sizes go up. Parent sets position.**
-
-Widgets receive constraints from parents, determine their size, then report size up to parent. Parents then position children.
-
-Key limitation: Widgets can only decide size within parent constraints. They cannot know or control their own position.
-
-For detailed examples and edge cases, see [layout-constraints.md](references/layout-constraints.md).
-
-### Common Layout Patterns
-
-**Row/Column**
-- `Row` arranges children horizontally
-- `Column` arranges children vertically
-- Control alignment with `mainAxisAlignment` and `crossAxisAlignment`
-- Use `Expanded` to make children fill available space proportionally
-
-**Container**
-- Add padding, margins, borders, background
-- Can constrain size with width/height
-- Without child/size, expands to fill constraints
-
-**Expanded/Flexible**
-- `Expanded` forces child to use available space
-- `Flexible` allows child to use available space but can be smaller
-- Use `flex` parameter to control proportions
-
-For complete widget documentation, see [layout-basics.md](references/layout-basics.md) and [layout-common-widgets.md](references/layout-common-widgets.md).
-
-## Best Practices
-
-### Design Principles
-
-**Break down widgets**
-- Create small, focused widgets instead of large complex ones
-- Improves performance with `const` widgets
-- Makes testing and refactoring easier
-- Share common components across different layouts
-
-**Design to platform strengths**
-- Mobile: Focus on capturing content, quick interactions, location awareness
-- Tablet/Desktop: Focus on organization, manipulation, detailed work
-- Web: Leverage deep linking and easy sharing
-
-**Solve touch first**
-- Start with great touch UI
-- Test frequently on real mobile devices
-- Layer on mouse/keyboard as accelerators, not replacements
-
-### Implementation Guidelines
-
-**Never lock orientation**
-- Support both portrait and landscape
-- Multi-window and foldable devices require flexibility
-- Locked screens can be accessibility issues
-
-**Avoid device type checks**
-- Don't use `Platform.isIOS`, `Platform.isAndroid` for layout decisions
-- Use window size instead
-- Device type ≠ window size (windows, split screens, PiP)
-
-**Use breakpoints, not orientation**
-- Don't use `OrientationBuilder` for layout changes
-- Use `MediaQuery.sizeOf` or `LayoutBuilder` with breakpoints
-- Orientation doesn't indicate available space
-
-**Don't fill entire width**
-- On large screens, avoid full-width content
-- Use multi-column layouts with `GridView` or flex patterns
-- Constrain content width for readability
-
-**Support multiple inputs**
-- Implement keyboard navigation for accessibility
-- Support mouse hover effects
-- Handle focus properly for custom widgets
-
-For complete best practices, see [adaptive-best-practices.md](references/adaptive-best-practices.md).
-
-## Capabilities and Policies
-
-Separate what your code *can* do from what it *should* do.
-
-**Capabilities** (what code can do)
-- API availability checks
-- OS-enforced restrictions
-- Hardware requirements (camera, GPS, etc.)
-
-**Policies** (what code should do)
-- App store guidelines compliance
-- Design preferences
-- Platform-specific features
-- Feature flags
-
-### Implementation Pattern
-
-```dart
-// Capability class
-class Capability {
-  bool hasCamera() {
-    // Check if camera API is available
-    return Platform.isAndroid || Platform.isIOS;
-  }
-}
-
-// Policy class
-class Policy {
-  bool shouldShowCameraFeature() {
-    // Business logic - maybe disabled by store policy
-    return hasCamera() && !Platform.isIOS;
-  }
-}
-```
-
-Benefits:
-- Clear separation of concerns
-- Easy to test (mock Capability/Policy independently)
-- Simple to update when platforms evolve
-- Business logic doesn't depend on device detection
-
-For detailed examples, see [adaptive-capabilities.md](references/adaptive-capabilities.md) and [capability_policy_example.dart](assets/capability_policy_example.dart).
-
-## Examples
-
-### Responsive Navigation
-
-Switch between bottom navigation (small screens) and navigation rail (large screens):
-
-```dart
-Widget build(BuildContext context) {
-  final width = MediaQuery.sizeOf(context).width;
-  
-  return width >= 600 
-    ? _buildNavigationRailLayout()
-    : _buildBottomNavLayout();
-}
-```
-
-Complete example: [responsive_navigation.dart](assets/responsive_navigation.dart)
-
-### Adaptive Grid
-
-Use `GridView.extent` with responsive maximum width:
-
-```dart
-LayoutBuilder(
-  builder: (context, constraints) {
-    return GridView.extent(
-      maxCrossAxisExtent: constraints.maxWidth < 600 ? 150 : 200,
-      // ...
-    );
-  },
-)
-```
-
-## Resources
-
-### Reference Documentation
-- [layout-constraints.md](references/layout-constraints.md) - Complete guide to Flutter's constraint system with 29 examples
-- [layout-basics.md](references/layout-basics.md) - Core layout widgets and patterns
-- [layout-common-widgets.md](references/layout-common-widgets.md) - Container, GridView, ListView, Stack, Card, ListTile
-- [adaptive-workflow.md](references/adaptive-workflow.md) - Detailed 3-step adaptive design approach
-- [adaptive-best-practices.md](references/adaptive-best-practices.md) - Design and implementation guidelines
-- [adaptive-capabilities.md](references/adaptive-capabilities.md) - Capability/Policy pattern for platform behavior
-
-### Example Code
-- [responsive_navigation.dart](assets/responsive_navigation.dart) - NavigationBar ↔ NavigationRail switching
-- [capability_policy_example.dart](assets/capability_policy_example.dart) - Capability/Policy class examples
-
-### Scripts
-This skill currently has no executable scripts. All guidance is in reference documentation.
-
-### Assets
-This skill includes complete Dart example files demonstrating:
-- Responsive navigation patterns
-- Capability and Policy implementation
-- Adaptive layout strategies
-
-These assets can be copied directly into your Flutter project or adapted to your needs.
+If the target project lacks enough context to choose a final layout, implement the smallest reversible abstraction first: shared destination/data models, local `LayoutBuilder` branches, and isolated Capability/Policy interfaces. Ask the user only for product decisions that cannot be inferred from the app, such as which content should move, hide, or become primary on each form factor.

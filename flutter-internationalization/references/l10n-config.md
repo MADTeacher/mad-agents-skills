@@ -1,6 +1,8 @@
 # l10n.yaml Configuration
 
-Complete reference for `l10n.yaml` configuration options used by Flutter's gen-l10n tool.
+Reference for `l10n.yaml` options used by Flutter's `gen-l10n` tool. Treat
+`flutter gen-l10n --help` in the user's project as the final source of truth
+when an installed SDK differs from these notes.
 
 ## Basic Configuration
 
@@ -10,102 +12,67 @@ template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
 ```
 
-### Required Options
+| Option | Description | Default |
+|---|---|---|
+| `arb-dir` | Directory containing template and translated ARB files | `lib/l10n` |
+| `template-arb-file` | Template ARB file used for generated Dart APIs | `app_en.arb` |
+| `output-localization-file` | Filename for generated localization and delegate classes | `app_localizations.dart` |
+| `output-class` | Dart class name for generated localizations | `AppLocalizations` |
+
+## Output Location
+
+By default, current Flutter generates localization source into the ARB directory
+or the configured `output-dir`. Import the generated file from that source
+location:
+
+```dart
+import 'l10n/app_localizations.dart';
+```
+
+Use a custom output directory only when the project wants generated files outside
+`arb-dir`:
+
+```yaml
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-dir: lib/generated/l10n
+```
+
+Then import from that directory:
+
+```dart
+import 'generated/l10n/app_localizations.dart';
+```
+
+Do not configure `synthetic-package: true`. Current Flutter marks the synthetic
+package flag as deprecated and it cannot be enabled. Migrate stale imports like
+`package:flutter_gen/gen_l10n/app_localizations.dart` to source imports that
+match the generated output location.
+
+## Locale Options
+
+```yaml
+preferred-supported-locales:
+  - en_US
+  - es_ES
+```
+
+`preferred-supported-locales` changes the generated supported-locale order. Use
+it when the app should prefer a specific regional locale instead of alphabetical
+ordering.
+
+## Code Generation Options
 
 | Option | Description | Default |
-|--------|-------------|---------|
-| `arb-dir` | Directory containing ARB files | `lib/l10n` |
-| `template-arb-file` | Template ARB file used as basis for generation | `app_en.arb` |
-| `output-localization-file` | Filename for generated localization classes | `app_localizations.dart` |
+|---|---|---|
+| `use-escaping` | Enable single quote escaping syntax for literal braces and quotes | `false` |
+| `nullable-getter` | Whether `AppLocalizations.of(context)` returns nullable | `true` |
+| `use-named-parameters` | Generate named parameters for message methods | `false` |
+| `format` | Run `dart format` after generation | enabled by default in current Flutter |
 
-## Advanced Configuration Options
-
-### Output Options
-
-| Option | Description | Example |
-|--------|-------------|---------|
-| `output-dir` | Directory for generated localization files | `lib/generated` |
-| `output-class` | Dart class name for localizations | `MyAppLocalizations` |
-| `header` | String header to prepend to generated files | `"/// Localizations"` |
-| `header-file` | File containing header text | `header.txt` |
-
-### Locale Options
-
-| Option | Description | Example |
-|--------|-------------|---------|
-| `preferred-supported-locales` | Default locale list | `[en_US, es_ES]` |
-
-### Code Generation Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `use-escaping` | Enable single quote escaping syntax | `false` |
-| `nullable-getter` | Make localizations class getter nullable | `true` |
-| `use-named-parameters` | Use named parameters for methods | `false` |
-| `format` | Run `dart format` after generation | `true` |
-
-### Generation Tracking
-
-| Option | Description | Example |
-|--------|-------------|---------|
-| `gen-inputs-and-outputs-list` | Directory for JSON tracking file | `.` |
-| `synthetic-package` | Generate as synthetic package | `true` |
-| `project-dir` | Root Flutter project directory | `/path/to/project` |
-
-### Translation Tracking
-
-| Option | Description | Example |
-|--------|-------------|---------|
-| `untranslated-messages-file` | File for untranslated messages | `untranslated.json` |
-
-### Additional Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `suppress-warnings` | Suppress all warnings | `false` |
-| `relax-syntax` | Relaxed syntax parsing | `false` |
-| `required-resource-attributes` | Require resource attributes | `false` |
-| `use-deferred-loading` | Use deferred loading for locales | `false` |
-
-## Common Configurations
-
-### Standard Setup
-
-```yaml
-arb-dir: lib/l10n
-template-arb-file: app_en.arb
-output-localization-file: app_localizations.dart
-```
-
-### Custom Output Directory
-
-```yaml
-arb-dir: lib/l10n
-template-arb-file: app_en.arb
-output-localization-file: app_localizations.dart
-output-dir: lib/generated
-synthetic-package: false
-```
-
-### Custom Class Name
-
-```yaml
-arb-dir: lib/l10n
-template-arb-file: app_en.arb
-output-localization-file: app_localizations.dart
-output-class: MyAppLocalizations
-```
-
-### Deferred Loading for Web
-
-```yaml
-arb-dir: lib/l10n
-template-arb-file: app_en.arb
-output-localization-file: app_localizations.dart
-use-deferred-loading: true
-```
-
-### Non-Nullable Getter
+Use `nullable-getter: false` only when the project accepts non-null generated
+getter behavior:
 
 ```yaml
 arb-dir: lib/l10n
@@ -114,48 +81,72 @@ output-localization-file: app_localizations.dart
 nullable-getter: false
 ```
 
-### Tracking Untranslated Messages
+With the default nullable getter, user code usually needs:
+
+```dart
+AppLocalizations.of(context)!.title
+```
+
+With `nullable-getter: false`, the generated getter performs the null check and
+call sites can omit `!`:
+
+```dart
+AppLocalizations.of(context).title
+```
+
+## Tracking And Warnings
+
+| Option | Description | Example |
+|---|---|---|
+| `untranslated-messages-file` | JSON file that lists messages missing from translations | `l10n_untranslated.json` |
+| `gen-inputs-and-outputs-list` | Directory for `gen_l10n_inputs_and_outputs.json` | `.` |
+| `project-dir` | Root Flutter project directory for generation | `/path/to/project` |
+| `required-resource-attributes` | Require metadata entries for all resource ids | `true` |
+| `suppress-warnings` | Suppress generator warnings | `true` |
+| `relax-syntax` | Treat unmatched braces as literal text in relaxed cases | `true` |
+
+Track untranslated messages when adding or auditing locale coverage:
 
 ```yaml
 arb-dir: lib/l10n
 template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
-untranslated-messages-file: untranslated.json
+untranslated-messages-file: l10n_untranslated.json
 ```
 
-## Using Deferred Loading
+## Deferred Loading
 
-Deferred loading reduces initial bundle size for web apps by loading locale files on demand:
+Deferred loading can reduce initial JavaScript bundle size for web apps with
+many locales and many messages. It can add overhead for small locale sets, and
+it does not affect mobile or desktop.
 
 ```yaml
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
 use-deferred-loading: true
 ```
 
-Then import and use:
+Use the normal generated source import:
 
 ```dart
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'l10n/app_localizations.dart';
 
-Future<AppLocalizations> loadLocale(String localeCode) async {
-  return await AppLocalizations.delegate.load(Locale(localeCode));
+Future<AppLocalizations> loadLocale(String localeCode) {
+  return AppLocalizations.delegate.load(Locale(localeCode));
 }
 ```
 
 ## Header Configuration
 
-### String Header
-
 ```yaml
-header: "/// All localized files generated by flutter gen-l10n"
+header: "/// Generated localization files."
 ```
 
-### File Header
+For a longer header, place the file in `arb-dir`:
 
-Create `lib/l10n/header.txt`:
-```
-/// Copyright 2024 My Company
-/// All rights reserved
-/// Generated localization files
+```text
+lib/l10n/header.txt
 ```
 
 Then configure:
@@ -164,6 +155,14 @@ Then configure:
 header-file: header.txt
 ```
 
-## Number Formatting
+## Validation
 
-For placeholder number formatting options, see [number-formats.md](number-formats.md).
+After changing `l10n.yaml`:
+
+1. Run `flutter gen-l10n`.
+2. Confirm generated files appear in `arb-dir` or `output-dir`.
+3. Confirm app imports match the generated location.
+4. Run the narrowest relevant compile check, usually `flutter analyze`.
+
+For placeholder number and date formats, see
+[number-date-formats.md](number-date-formats.md).

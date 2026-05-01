@@ -1,248 +1,75 @@
 ---
 name: flutter-drift
-description: Complete guide for using drift database library in Flutter applications. Use when building Flutter apps that need local SQLite database storage with type-safe queries, reactive streams, migrations, and efficient CRUD operations. Includes setup with drift_flutter package, StreamBuilder integration, Provider/Riverpod patterns, and Flutter-specific database management for mobile, web, and desktop platforms.
+description: Implement, fix, review, migrate, test, or debug Drift persistence in Flutter apps using SQLite, drift_flutter, type-safe Dart queries, generated tables, StreamBuilder or Riverpod StreamProvider UI, write operations, transactions, schema migrations, web assets, isolate sharing, and local database testing. Use when a Flutter task mentions drift, local database storage, SQLite, reactive database streams, CRUD, schemaVersion, build_runner, drift_dev make-migrations, migration tests, or Flutter-specific database setup across mobile, web, or desktop.
 metadata:
   author: Stanislav [MADTeacher] Chernyshev
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Flutter Drift
 
-Comprehensive guide for using drift database library in Flutter applications.
+Use this skill to add or repair Drift-based local persistence in Flutter apps. The skill is an operating workflow: inspect the target app first, choose only the relevant reference files, implement with current Drift APIs, and validate generated code.
 
-## Overview
+## Core Workflow
 
-Flutter Drift skill provides complete guidance for implementing persistent local storage in Flutter apps using the drift library. Drift is a reactive persistence library for Flutter built on SQLite, offering type-safe queries, auto-updating streams, schema migrations, and cross-platform support.
+1. Inspect the app before editing:
+   - Check `pubspec.yaml`, existing database files, `build.yaml`, state management package, target platforms, and tests.
+   - Prefer the app's current architecture and naming over the examples in this skill.
+2. Add or verify dependencies with package commands instead of hardcoding versions:
+   - `dart pub add drift drift_flutter path_provider dev:drift_dev dev:build_runner`
+   - Add `provider` or `flutter_riverpod` only when the app already uses it or the user asks for that integration.
+3. Create or update the database entry point:
+   - Define tables in Dart or `.drift` files.
+   - Add the tables to `@DriftDatabase`.
+   - Open Flutter databases with `driftDatabase` from `package:drift_flutter/drift_flutter.dart` unless the project needs a custom executor.
+4. Keep Drift calls scoped to the database object:
+   - Use `database.select(database.todoItems)`, `database.into(database.todoItems)`, `database.update(database.todoItems)`, and `database.delete(database.todoItems)` from widgets, services, and repositories.
+   - Use bare `select(todoItems)` only inside `GeneratedDatabase` subclasses or `DatabaseAccessor` classes where the methods and table getters are in scope.
+5. Generate code after changing Drift declarations:
+   - Run `dart run build_runner build`.
+   - Treat generator errors as blockers, not optional cleanup.
+6. For schema changes in an existing app, use Drift's guided migration workflow:
+   - Configure `drift_dev` databases in `build.yaml`.
+   - Run `dart run drift_dev make-migrations` before and after schema changes as needed.
+   - Bump `schemaVersion`, write generated step-by-step migrations, and run generated migration tests.
+7. Validate before finishing:
+   - Run `dart format` on edited Dart files.
+   - Run `flutter analyze` or `dart analyze` for the package.
+   - Run targeted tests, including generated migration tests when migrations changed.
 
-## Quick Start
+## Resource Routing
 
-Add dependencies to `pubspec.yaml`:
+- Read [references/setup.md](references/setup.md) when adding Drift, opening a database, configuring web support, or sharing a database across isolates.
+- Read [references/tables.md](references/tables.md) when defining tables, columns, defaults, keys, indexes, constraints, generated columns, or strict tables.
+- Read [references/queries.md](references/queries.md) when implementing selects, filters, sorting, pagination, joins, aggregations, subqueries, custom columns, or unions.
+- Read [references/writes.md](references/writes.md) when implementing inserts, updates, deletes, upserts, companions, transactions, or batch operations.
+- Read [references/streams.md](references/streams.md) when implementing reactive Drift streams, StreamBuilder, StreamProvider, custom select streams, table update listeners, or manual stream invalidation.
+- Read [references/migrations.md](references/migrations.md) when `schemaVersion`, existing user data, `build.yaml`, `make-migrations`, generated schema files, or migration tests are involved.
+- Read [references/flutter-ui.md](references/flutter-ui.md) when wiring Drift data into Flutter widgets with Provider, Riverpod, StreamBuilder, search, filtering, pagination, or user-facing loading and error states.
 
-```yaml
-dependencies:
-  drift: ^2.30.0
-  drift_flutter: ^0.2.8
-  path_provider: ^2.1.5
+## Required API Rules
 
-dev_dependencies:
-  drift_dev: ^2.30.0
-  build_runner: ^2.10.4
-```
+- Do not call `select(database.table)` as a top-level function from a widget. Use `database.select(database.table)` outside database classes.
+- Do not use `watch(...)`, `todoUpdates(...)`, or `notifyTableUpdates(...)`. Use `customSelect(...).watch()`, `tableUpdates(...)`, and `notifyUpdates(...)`.
+- Do not call `delete(table).go(id)`. Add a `where` clause and then call `go()`, or use generated table extension helpers if the project already uses them.
+- Do not use `batch.updateAll(...)` or pass raw ids to `batch.delete(...)`. Use `batch.update(..., where: ...)`, `batch.delete(...)` with an insertable row, or `batch.deleteWhere(...)`.
+- Do not mix Provider and Riverpod APIs. `Provider.of<AppDatabase>(context)` belongs to `provider`; `Provider<AppDatabase>((ref) { ... })` and `AsyncValue.when(...)` belong to Riverpod.
+- Do not bump `schemaVersion` without a migration plan for existing databases.
+- Do not rely on raw SQLite writes when UI streams must update. Use Drift write APIs or call `notifyUpdates` with explicit `TableUpdate` metadata.
 
-Define database:
+## Fallbacks
 
-```dart
-@DriftDatabase(tables: [TodoItems])
-class AppDatabase extends _$AppDatabase {
-  AppDatabase([QueryExecutor? e])
-      : super(
-          e ??
-              driftDatabase(
-                name: 'app_db',
-                native: const DriftNativeOptions(
-                  databaseDirectory: getApplicationSupportDirectory,
-                ),
-                web: DriftWebOptions(
-                  sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-                  driftWorker: Uri.parse('drift_worker.js'),
-                ),
-              ),
-        );
+- If package downloads are blocked, update source files and leave exact `dart pub add` or `flutter pub add` commands for the user, then state that dependency resolution was not validated.
+- If a project cannot run `build_runner`, do not hand-write generated `*.g.dart` files. Fix source declarations and report the generator blocker.
+- If migration state is unclear, stop before changing `schemaVersion`; ask for the current released schema history or database files.
+- If web support is required but `sqlite3.wasm` and `drift_worker.js` are missing, add the code path and explicitly report the required web assets.
 
-  @override
-  int get schemaVersion => 1;
-}
-```
+## Validation Checklist
 
-Run code generator:
-
-```bash
-dart run build_runner build
-```
-
-## Reference Files
-
-See detailed documentation for each topic:
-
-- [setup.md](references/setup.md) - Flutter-specific setup with drift_flutter
-- [tables.md](references/tables.md) - Table definitions, columns, constraints
-- [queries.md](references/queries.md) - SELECT, WHERE, JOIN, aggregations
-- [writes.md](references/writes.md) - INSERT, UPDATE, DELETE, transactions
-- [streams.md](references/streams.md) - Reactive stream queries
-- [migrations.md](references/migrations.md) - Database schema migrations
-- [flutter-ui.md](references/flutter-ui.md) - Flutter UI integration patterns
-
-## Common Patterns
-
-### Reactive Todo List with StreamBuilder
-
-```dart
-class TodoList extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final database = Provider.of<AppDatabase>(context);
-
-    return StreamBuilder<List<TodoItem>>(
-      stream: select(database.todoItems).watch(),
-      builder: (context, snapshot) {
-        final todos = snapshot.data ?? [];
-        return ListView.builder(
-          itemCount: todos.length,
-          itemBuilder: (context, index) {
-            final todo = todos[index];
-            return ListTile(
-              title: Text(todo.title),
-              trailing: Checkbox(
-                value: todo.isCompleted,
-                onChanged: (value) {
-                  database.update(database.todoItems).replace(
-                    TodoItem(
-                      id: todo.id,
-                      title: todo.title,
-                      isCompleted: value ?? false,
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-```
-
-### Add Item with Form
-
-```dart
-Future<void> showAddTodoDialog(BuildContext context) async {
-  final controller = TextEditingController();
-  final database = Provider.of<AppDatabase>(context);
-
-  await showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Add Todo'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Title'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (controller.text.isNotEmpty) {
-                await database.into(database.todoItems).insert(
-                  TodoItemsCompanion.insert(title: controller.text),
-                );
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      );
-    },
-  );
-
-  controller.dispose();
-}
-```
-
-### Provider Setup
-
-```dart
-final databaseProvider = Provider<AppDatabase>((ref) {
-  final database = AppDatabase();
-  ref.onDispose(database.close);
-  return database;
-});
-```
-
-### Database Migration
-
-```dart
-@override
-MigrationStrategy get migration {
-  return MigrationStrategy(
-      onUpgrade: stepByStep(
-        from1To2: (m, schema) async {
-          await m.addColumn(schema.todoItems, schema.todoItems.dueDate);
-        },
-      ),
-    );
-}
-```
-
-## Platform-Specific Setup
-
-### Mobile (Android/iOS/macOS/Windows/Linux)
-
-Uses `drift_flutter` with `getApplicationSupportDirectory`.
-
-### Web
-
-Place `sqlite3.wasm` and `drift_worker.js` in `web/` folder.
-
-### Isolate Sharing
-
-```dart
-AppDatabase.defaults(): super(
-  driftDatabase(
-    name: 'app_db',
-    native: DriftNativeOptions(
-      shareAcrossIsolates: true,
-    ),
-  ),
-);
-```
-
-## Testing
-
-Use in-memory database for tests:
-
-```dart
-AppDatabase createTestDatabase() {
-  return AppDatabase(NativeDatabase.memory());
-}
-```
-
-## Best Practices
-
-1. **Use drift_flutter** for easy database setup across platforms
-2. **StreamBuilder** for reactive UI updates
-3. **Provider/Riverpod** for database access management
-4. **Close database** on app/widget dispose
-5. **Use migrations** when schema changes
-6. **Index columns** used in WHERE clauses
-7. **Limit stream query size** for performance
-8. **Use transactions** for multi-step operations
-9. **Debounce user input** for search/filter
-10. **Handle loading/error states** in UI
-
-## Troubleshooting
-
-### Build Fails
-
-```bash
-dart run build_runner clean
-dart run build_runner build --delete-conflicting-outputs
-```
-
-### Migration Errors
-
-```bash
-dart run drift_dev schema validate
-dart run drift_dev make-migrations
-```
-
-### Stream Not Updating
-
-Ensure operations go through drift APIs, not raw SQLite.
+- `pubspec.yaml` contains Drift runtime and generator dependencies.
+- Database files have valid `part` directives, table declarations, `@DriftDatabase`, constructor, and `schemaVersion`.
+- All query and write examples are scoped to the correct database/accessor context.
+- Generated code was rebuilt with `build_runner`.
+- Flutter UI examples handle loading, empty, error, and data states without treating `AsyncValue` as a `List`.
+- Migrations changed only with generated schema snapshots, step-by-step migration code, and tests.
+- `flutter analyze` or `dart analyze` passes for the edited package, or any remaining analyzer failure is reported with the blocker.

@@ -1,10 +1,10 @@
 ---
 name: agents-md-generator
-description: Create or update minimal AGENTS.md files in the repository root and nested module directories using progressive disclosure. Works across heterogeneous projects without assuming any fixed agent folder structure.
+description: Create, generate, update, repair, trim, or split minimal AGENTS.md files for repository roots and confirmed nested modules using progressive disclosure. Use for missing, bloated, contradictory, or outdated agent instructions, monorepos, services, packages, module context, and portable agent guidance without assuming any fixed agent folder structure.
 compatibility: Filesystem-based coding agents with read/write access. Script execution optional.
 metadata:
   author: Stanislav [MADTeacher] Chernyshev
-  version: "1.0"
+  version: "2.0"
 ---
 
 # AGENTS.md Generator (Root + Nested, Portable)
@@ -24,9 +24,23 @@ Use **progressive disclosure**: keep AGENTS.md concise; push details to docs or 
 - Skills may live:
   - inside the repository (embedded),
   - or in an external/global skill library (external).
-- If referencing local skills, first detect an existing skill root already used by the project.
+- If referencing local skills, use only an existing skill root already used by
+  the project or an existing project path already mentioned by repo docs.
 - If no local skill directory exists — **reference skills by name only (external)**.
 - **Never create hidden agent directories** just to store skills.
+
+---
+
+## Resource Routing
+
+Use templates as skeletons, not literal output:
+
+- Read `references/AGENTS_TEMPLATE_ROOT.md` only when creating or updating the
+  root `AGENTS.md`.
+- Read `references/AGENTS_TEMPLATE_MODULE.md` only after a directory is
+  confirmed as a nested module that needs its own `AGENTS.md`.
+- Replace or remove every placeholder. Final `AGENTS.md` files must not contain
+  unresolved `<...>` template markers.
 
 ---
 
@@ -34,6 +48,7 @@ Use **progressive disclosure**: keep AGENTS.md concise; push details to docs or 
 Run this skill when:
 
 - AGENTS.md is missing, bloated, contradictory, or outdated.
+- AGENTS.md needs to be generated, repaired, trimmed, split, or updated.
 - A new package/service/module appears.
 - Repository structure changes (monorepo growth or split).
 - Teams want consistent agent context across diverse stacks.
@@ -60,7 +75,10 @@ Create nested AGENTS.md if directory:
 
 - Contains independent build/package manifest
 - OR represents deployable/service unit (`apps/`, `services/`, `packages/`)
-- AND differs in stack/toolchain from parent scope
+- AND adds distinct commands, docs, ownership, deployment notes, or toolchain
+  guidance compared with parent scope.
+
+Do not create a nested `AGENTS.md` that only repeats the root instructions.
 
 ---
 
@@ -75,6 +93,8 @@ Constraints:
   - Links to docs
   - Instruction to read nested AGENTS.md when inside modules
   - Optional skill references (adaptive: local or external)
+- Preserve verified commands, docs, security/secrets/deployment warnings, and
+  important local rules from any existing root `AGENTS.md`.
 
 ---
 
@@ -87,15 +107,17 @@ Constraints:
   - Module-specific commands
   - Local documentation references
   - Optional skill references (adaptive)
+- Preserve verified module warnings, ownership, deployment notes, and local
+  rules from any existing nested `AGENTS.md`.
 
 ---
 
 ### 5. Progressive Disclosure Rules
 - Do not embed style guides, CI policies, or architecture details.
-- Prefer links to:
-  - `docs/STYLE_GUIDE.md`
-  - `docs/ARCHITECTURE.md`
-  - external or local skills
+- Prefer links to existing docs and external or local skills.
+- Include only links that exist or are explicitly cited as the source for
+  commands or policy.
+- Replace stale long-form sections with links when an authoritative doc exists.
 - Avoid “always/never” rules unless critical for correctness/security.
 
 ---
@@ -108,7 +130,7 @@ Constraints:
   - CI configuration
   - README
 - If uncertain → write:
-  “Known commands: see <file>”
+  “Known commands: see <existing file>”
 - Preserve critical warnings (security, secrets, deployment).
 
 ---
@@ -138,3 +160,19 @@ When adding skill references inside AGENTS.md:
    ```
 
 Never assume filesystem paths.
+
+---
+
+## Validation
+
+Before finishing, verify:
+
+- Only root/module `AGENTS.md` files were created or updated.
+- Final `AGENTS.md` files contain no unresolved `<...>` placeholders.
+- Relative documentation links exist or clearly point to a source file for
+  commands/policy.
+- Commands are supported by package scripts, Makefile, CI configuration, or
+  README. If no command is verified, use `Known commands: see <existing file>`.
+- Line budgets are respected: root ≤ 60 lines, nested module ≤ 40 lines.
+- Nested files exist only for confirmed module boundaries.
+- Critical warnings from existing `AGENTS.md` files are preserved.

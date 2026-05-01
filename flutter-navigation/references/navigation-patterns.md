@@ -1,105 +1,163 @@
 # Navigation Patterns
 
-## Choosing a Navigation Approach
+Use this reference to choose a navigation approach before editing app code.
 
-### Simple Apps (No Deep Linking)
-Use **Navigator API** with `Navigator.push()` and `Navigator.pop()`. Best for:
-- Single-screen to multi-screen transitions
-- Simple navigation stacks
-- No requirement for deep linking or browser history
+## Approach Selection
+
+### Navigator With MaterialPageRoute
+
+Use for simple, local flows that do not need to be addressable by URL:
+
+- opening a detail screen from a list in a small mobile app;
+- selecting a value and returning it to the previous screen;
+- modal-like flows that should not survive browser refresh or external links.
 
 Example: `assets/navigator_basic.dart`
 
-### Named Routes (Not Recommended)
-Flutter team does NOT recommend named routes for most applications. Use only for:
-- Very simple apps with static routes
-- Basic deep linking without custom behavior
+```dart
+final result = await Navigator.of(context).push<String>(
+  MaterialPageRoute<String>(
+    builder: (context) => const SelectionScreen(),
+  ),
+);
+if (!context.mounted) return;
+```
 
-Limitations:
-- Cannot customize deep link behavior
-- No browser forward button support
-- Always pushes new routes regardless of current state
+### go_router
 
-### Complex Apps (Deep Linking, Web, Multiple Navigators)
-Use **go_router** (declarative routing). Recommended for:
-- Apps requiring deep linking
-- Web applications with browser history
-- Complex navigation patterns
-- Multiple Navigator widgets
-- URL-based navigation
+Use for route tables that need stable URLs or controlled page stacks:
+
+- web apps with browser back, forward, refresh, and direct links;
+- Android App Links, iOS Universal Links, or custom schemes;
+- auth, onboarding, or feature redirects;
+- nested navigation with persistent app shell;
+- multiple Navigator branches;
+- scalable route names and generated locations.
 
 Example: `assets/go_router_basic.dart`
 
-## Common Patterns
+### Legacy MaterialApp.routes Named Routes
 
-### Passing Data Between Screens
+Avoid adding new legacy named routes for most apps. They can handle simple
+static route names, but incoming deep links always push a new route and browser
+forward support is limited. Preserve them only when maintaining a small existing
+app with no custom deep-link or web-history requirements.
 
-**Method 1: Constructor parameters** (with Navigator)
+## Data Passing
+
+### Constructor Data With Navigator
+
+Use direct constructor arguments for local, in-memory data:
+
 ```dart
 Navigator.push(
   context,
-  MaterialPageRoute(builder: (context) => DetailScreen(item: myItem)),
+  MaterialPageRoute<void>(
+    builder: (context) => DetailScreen(item: item),
+  ),
 );
 ```
 
 Example: `assets/passing_data.dart`
 
-**Method 2: Query parameters** (with go_router)
-```dart
-context.push('/details?id=123&name=test');
+### Path Parameters With go_router
 
-// Extract in screen
-final id = state.uri.queryParameters['id'];
+Use path parameters for required identity:
+
+```dart
+GoRoute(
+  path: '/users/:userId',
+  builder: (context, state) {
+    final userId = state.pathParameters['userId']!;
+    return UserScreen(userId: userId);
+  },
+);
+
+context.go('/users/42');
 ```
 
-**Method 3: Arguments with named routes** (not recommended)
+### Query Parameters With go_router
+
+Use query parameters for optional URL state:
+
 ```dart
-Navigator.pushNamed(context, '/details', arguments: myItem);
-final item = ModalRoute.of(context)!.settings.arguments as MyItem;
+final location = Uri(
+  path: '/search',
+  queryParameters: {'q': 'flutter', 'tab': 'docs'},
+).toString();
+
+context.go(location);
 ```
 
-### Returning Data From Screens
+Read them from `state.uri.queryParameters`:
 
-Use `await Navigator.push()`:
 ```dart
-final result = await Navigator.push(
+final query = state.uri.queryParameters['q'] ?? '';
+```
+
+### Extra Data With go_router
+
+Use `extra` only for data that is intentionally not addressable:
+
+```dart
+context.push('/details', extra: item);
+```
+
+Do not rely on `extra` for browser refresh, shared URLs, or native deep-link
+entry.
+
+## Returning Data
+
+Navigator:
+
+```dart
+final result = await Navigator.push<String>(
   context,
-  MaterialPageRoute<String>(builder: (context) => SelectionScreen()),
+  MaterialPageRoute<String>(builder: (context) => const SelectionScreen()),
 );
 if (!context.mounted) return;
-ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$result')));
+```
+
+go_router:
+
+```dart
+final result = await context.push<String>('/selection');
+if (!context.mounted) return;
+```
+
+Return from the pushed route:
+
+```dart
+context.pop('selected-value');
 ```
 
 Example: `assets/returning_data.dart`
 
-### Deep Linking Behavior
+## Deep Linking Behavior
 
-| Platform | Navigator | Router/go_router |
-|----------|-----------|-------------------|
-| iOS (not launched) | Gets initialRoute "/" then pushRoute | Gets initialRoute "/" then RouteInformationParser |
-| Android (not launched) | Gets initialRoute containing route | Gets initialRoute with route path |
-| iOS/Android (launched) | pushRoute called | Route parsed, Navigator configured |
-| Web | No browser forward button | Full browser History API integration |
+| Requirement | Prefer |
+|---|---|
+| Direct URL opens a predictable page stack | `go_router` or Router API |
+| App replaces current pages when a link is opened | `go_router` or Router API |
+| Browser forward/back support | `go_router` or Router API |
+| Very simple mobile-only stack | `Navigator` |
+| Static legacy app route names | Existing `MaterialApp.routes`, with limitations |
 
-## Web-Specific Considerations
+When Router and imperative Navigator are mixed, pages pushed imperatively are
+not deep-linkable and can be removed when the parent Router-backed page changes.
 
-### URL Strategies
+## Web-Specific Choices
 
-**Hash (default)**: `example.com/#/path/to/screen`
-- No server configuration needed
-- Works with all web servers
-- URL looks less clean
+Hash strategy works without server changes:
 
-**Path**: `example.com/path/to/screen`
-- Requires server configuration (SPA rewrite)
-- Cleaner URLs
-- Use `usePathUrlStrategy()` before `runApp()`
+```text
+https://example.com/#/details/42
+```
 
-See [web-navigation.md](web-navigation.md) for detailed setup.
+Path strategy needs server rewrites but gives cleaner URLs:
 
-### Navigation Methods
+```text
+https://example.com/details/42
+```
 
-- **Navigator**: Imperative, creates pageless routes (not deep-linkable)
-- **Router/go_router**: Declarative, creates page-backed routes (deep-linkable)
-
-When using Router with Navigator together, removing a page-backed route also removes all subsequent pageless routes.
+See [web-navigation.md](web-navigation.md) for setup and validation.

@@ -118,4 +118,10 @@ class _PostExampleState extends State<PostExample> {
       },
     );
   }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 }

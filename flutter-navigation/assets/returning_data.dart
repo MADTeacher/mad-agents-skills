@@ -41,10 +41,11 @@ class _SelectionButtonState extends State<SelectionButton> {
     );
 
     if (!context.mounted) return;
+    if (result == null) return;
 
     ScaffoldMessenger.of(context)
       ..removeCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$result')));
+      ..showSnackBar(SnackBar(content: Text(result)));
   }
 }
 

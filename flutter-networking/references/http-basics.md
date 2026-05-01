@@ -234,7 +234,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    futureAlbum = fetchAlbum();
+    futureAlbum = fetchAlbum(1);
   }
 
   @override
@@ -260,6 +260,8 @@ class _MyAppState extends State<MyApp> {
 ## Timeout Configuration
 
 ```dart
+import 'dart:async';
+
 Future<Album> fetchAlbum() async {
   try {
     final response = await http.get(
@@ -271,9 +273,13 @@ Future<Album> fetchAlbum() async {
       },
     );
 
-    return Album.fromJson(jsonDecode(response.body));
+    if (response.statusCode == 200) {
+      return Album.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    }
+
+    throw ApiHttpException.fromResponse(response);
   } on TimeoutException catch (e) {
-    throw Exception('Request timed out: $e');
+    throw ApiTimeoutException('Request timed out: ${e.message}');
   }
 }
 ```

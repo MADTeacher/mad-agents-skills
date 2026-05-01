@@ -1,114 +1,54 @@
 # Authentication
 
-## Overview
-
-Complete guide for implementing authentication in Flutter HTTP requests.
+Use this reference when a Flutter networking task needs authorization headers,
+token storage, login, refresh, or authenticated retry behavior.
 
 ## Authentication Methods
 
-### Bearer Token (JWT)
-
-Most common for REST APIs using JWT (JSON Web Tokens):
+### Bearer Token
 
 ```dart
-import 'dart:io';
-
-Future<Album> fetchAlbum(String token) async {
-  final response = await http.get(
+Future<Album> fetchAlbum(http.Client client, String token) async {
+  final response = await client.get(
     Uri.parse('https://api.example.com/albums/1'),
-    headers: {HttpHeaders.authorizationHeader: 'Bearer $token'},
+    headers: {'Authorization': 'Bearer $token'},
   );
 
   if (response.statusCode == 200) {
-    return Album.fromJson(jsonDecode(response.body));
-  } else {
-    throw Exception('Failed to load album');
+    return Album.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
+
+  throw ApiHttpException.fromResponse(response);
 }
 ```
 
 ### Basic Authentication
 
 ```dart
-import 'dart:convert';
-
 String basicAuthHeader(String username, String password) {
   final credentials = '$username:$password';
   return 'Basic ${base64Encode(utf8.encode(credentials))}';
 }
 
-Future<Album> fetchAlbum(String username, String password) async {
-  final response = await http.get(
-    Uri.parse('https://api.example.com/albums/1'),
-    headers: {
-      HttpHeaders.authorizationHeader: basicAuthHeader(username, password),
-    },
-  );
-
-  if (response.statusCode == 200) {
-    return Album.fromJson(jsonDecode(response.body));
-  } else {
-    throw Exception('Failed to load album');
-  }
-}
+final response = await client.get(
+  Uri.parse('https://api.example.com/me'),
+  headers: {'Authorization': basicAuthHeader(username, password)},
+);
 ```
 
 ### API Key
 
 ```dart
-Future<Album> fetchAlbum(String apiKey) async {
-  final response = await http.get(
-    Uri.parse('https://api.example.com/albums/1'),
-    headers: {'X-API-Key': apiKey},
-  );
-
-  if (response.statusCode == 200) {
-    return Album.fromJson(jsonDecode(response.body));
-  } else {
-    throw Exception('Failed to load album');
-  }
-}
+final response = await client.get(
+  Uri.parse('https://api.example.com/data'),
+  headers: {'X-API-Key': apiKey},
+);
 ```
 
 ## Token Storage
 
-### Using shared_preferences
-
-Add to `pubspec.yaml`:
-
-```yaml
-dependencies:
-  shared_preferences: ^2.5.4
-```
-
-Store and retrieve tokens:
-
-```dart
-import 'package:shared_preferences/shared_preferences.dart';
-
-class TokenStorage {
-  static const String _tokenKey = 'auth_token';
-
-  Future<void> saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
-  }
-
-  Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
-  }
-
-  Future<void> clearToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
-  }
-}
-```
-
-### Using flutter_secure_storage
-
-For more secure storage:
+Use `flutter_secure_storage` for access tokens, refresh tokens, and other
+sensitive values:
 
 ```yaml
 dependencies:
@@ -118,201 +58,203 @@ dependencies:
 ```dart
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-class SecureTokenStorage {
-  final _storage = const FlutterSecureStorage();
-  static const String _tokenKey = 'auth_token';
+class TokenPair {
+  final String accessToken;
+  final String refreshToken;
+  final DateTime expiresAt;
 
-  Future<void> saveToken(String token) async {
-    await _storage.write(key: _tokenKey, value: token);
-  }
+  const TokenPair({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.expiresAt,
+  });
 
-  Future<String?> getToken() async {
-    return await _storage.read(key: _tokenKey);
-  }
-
-  Future<void> clearToken() async {
-    await _storage.delete(key: _tokenKey);
-  }
-}
-```
-
-## Authenticated HTTP Client
-
-### Wrapper Class
-
-```dart
-import 'dart:io';
-import 'package:http/http.dart' as http;
-
-class AuthenticatedHttpClient {
-  final TokenStorage _tokenStorage;
-
-  AuthenticatedHttpClient(this._tokenStorage);
-
-  Future<http.Response> get(String url) async {
-    final token = await _tokenStorage.getToken();
-    if (token == null) {
-      throw UnauthorizedException();
-    }
-
-    return await http.get(
-      Uri.parse(url),
-      headers: {HttpHeaders.authorizationHeader: 'Bearer $token'},
-    );
-  }
-
-  Future<http.Response> post(
-    String url, {
-    Map<String, String>? headers,
-    Object? body,
-  }) async {
-    final token = await _tokenStorage.getToken();
-    if (token == null) {
-      throw UnauthorizedException();
-    }
-
-    return await http.post(
-      Uri.parse(url),
-      headers: {
-        HttpHeaders.authorizationHeader: 'Bearer $token',
-        ...?headers,
-      },
-      body: body,
-    );
-  }
-
-  Future<http.Response> put(
-    String url, {
-    Map<String, String>? headers,
-    Object? body,
-  }) async {
-    final token = await _tokenStorage.getToken();
-    if (token == null) {
-      throw UnauthorizedException();
-    }
-
-    return await http.put(
-      Uri.parse(url),
-      headers: {
-        HttpHeaders.authorizationHeader: 'Bearer $token',
-        ...?headers,
-      },
-      body: body,
-    );
-  }
-
-  Future<http.Response> delete(String url) async {
-    final token = await _tokenStorage.getToken();
-    if (token == null) {
-      throw UnauthorizedException();
-    }
-
-    return await http.delete(
-      Uri.parse(url),
-      headers: {HttpHeaders.authorizationHeader: 'Bearer $token'},
-    );
+  bool get isExpired {
+    final refreshWindow = DateTime.now().add(const Duration(minutes: 1));
+    return !expiresAt.isAfter(refreshWindow);
   }
 }
 
-class UnauthorizedException implements Exception {
-  final String message;
-  UnauthorizedException([this.message = 'Unauthorized']);
+abstract class TokenStorage {
+  Future<TokenPair?> read();
+  Future<void> save(TokenPair tokens);
+  Future<void> clear();
+}
+
+class SecureTokenStorage implements TokenStorage {
+  static const _accessTokenKey = 'access_token';
+  static const _refreshTokenKey = 'refresh_token';
+  static const _expiresAtKey = 'expires_at';
+
+  final FlutterSecureStorage _storage;
+
+  const SecureTokenStorage([
+    this._storage = const FlutterSecureStorage(),
+  ]);
 
   @override
-  String toString() => message;
+  Future<TokenPair?> read() async {
+    final accessToken = await _storage.read(key: _accessTokenKey);
+    final refreshToken = await _storage.read(key: _refreshTokenKey);
+    final expiresAtRaw = await _storage.read(key: _expiresAtKey);
+
+    if (accessToken == null || refreshToken == null || expiresAtRaw == null) {
+      return null;
+    }
+
+    final expiresAt = DateTime.tryParse(expiresAtRaw);
+    if (expiresAt == null) {
+      await clear();
+      return null;
+    }
+
+    return TokenPair(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresAt: expiresAt,
+    );
+  }
+
+  @override
+  Future<void> save(TokenPair tokens) async {
+    await _storage.write(key: _accessTokenKey, value: tokens.accessToken);
+    await _storage.write(key: _refreshTokenKey, value: tokens.refreshToken);
+    await _storage.write(
+      key: _expiresAtKey,
+      value: tokens.expiresAt.toIso8601String(),
+    );
+  }
+
+  @override
+  Future<void> clear() async {
+    await _storage.delete(key: _accessTokenKey);
+    await _storage.delete(key: _refreshTokenKey);
+    await _storage.delete(key: _expiresAtKey);
+  }
 }
 ```
+
+`shared_preferences` is acceptable for non-sensitive session flags or cached
+profile preferences. If it is needed, use the current package line:
+
+```yaml
+dependencies:
+  shared_preferences: ^2.5.5
+```
+
+Do not store bearer tokens, refresh tokens, passwords, or API keys in
+`shared_preferences`.
 
 ## Token Refresh
 
-### Refresh Token Pattern
+Keep refresh logic in an auth manager or authenticated client. The manager owns
+the token lifecycle; callers ask it for a valid access token.
 
 ```dart
 class AuthManager {
   final TokenStorage _tokenStorage;
   final http.Client _client;
 
-  String? _accessToken;
-  String? _refreshToken;
-
   AuthManager(this._tokenStorage, this._client);
 
   Future<String> getAccessToken() async {
-    if (_accessToken != null && !_isTokenExpired(_accessToken)) {
-      return _accessToken!;
+    final tokens = await _tokenStorage.read();
+    if (tokens == null) {
+      throw const UnauthorizedException('Missing auth tokens');
     }
 
-    return await _refreshAccessToken();
+    if (!tokens.isExpired) {
+      return tokens.accessToken;
+    }
+
+    return refreshAccessToken(tokens.refreshToken);
   }
 
-  bool _isTokenExpired(String token) {
-    // Decode JWT and check expiration
-    return false;
-  }
-
-  Future<String> _refreshAccessToken() async {
+  Future<String> refreshAccessToken(String refreshToken) async {
     final response = await _client.post(
       Uri.parse('https://api.example.com/auth/refresh'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refreshToken': _refreshToken}),
+      body: jsonEncode({'refreshToken': refreshToken}),
     );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      _accessToken = data['accessToken'] as String;
-      _refreshToken = data['refreshToken'] as String;
-
-      await _tokenStorage.saveToken(_accessToken!);
-      return _accessToken!;
-    } else {
-      throw Exception('Failed to refresh token');
+    if (response.statusCode != 200) {
+      await _tokenStorage.clear();
+      throw ApiHttpException.fromResponse(response);
     }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final tokens = TokenPair(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+      expiresAt: DateTime.parse(data['expiresAt'] as String),
+    );
+
+    await _tokenStorage.save(tokens);
+    return tokens.accessToken;
   }
 
-  Future<void> logout() async {
-    await _tokenStorage.clearToken();
-    _accessToken = null;
-    _refreshToken = null;
+  Future<void> logout() {
+    return _tokenStorage.clear();
+  }
+
+  Future<TokenPair?> readTokens() {
+    return _tokenStorage.read();
   }
 }
 ```
 
-### Interceptor Pattern
+## Authenticated Client
+
+Do not resend the same `BaseRequest` after a 401. A streamed request may already
+be finalized. Accept a request factory, recreate the request after refresh, and
+retry only when the original operation is safe for the product/API contract.
 
 ```dart
-class AuthenticatedClient extends http.BaseClient {
+typedef RequestFactory = http.BaseRequest Function(String accessToken);
+
+class AuthenticatedClient {
   final http.Client _inner;
   final AuthManager _authManager;
 
   AuthenticatedClient(this._inner, this._authManager);
 
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+  Future<http.StreamedResponse> send(
+    RequestFactory requestFactory, {
+    bool retryOnUnauthorized = true,
+  }) async {
     final token = await _authManager.getAccessToken();
-    request.headers['Authorization'] = 'Bearer $token';
+    final response = await _inner.send(requestFactory(token));
 
-    final response = await _inner.send(request);
-
-    if (response.statusCode == 401) {
-      await _authManager.refreshAccessToken();
-      final newToken = await _authManager.getAccessToken();
-
-      request.headers['Authorization'] = 'Bearer $newToken';
-      return await _inner.send(request);
+    if (response.statusCode != 401 || !retryOnUnauthorized) {
+      return response;
     }
 
-    return response;
+    final tokens = await _authManager.readTokens();
+    if (tokens == null) {
+      return response;
+    }
+
+    await response.stream.drain<void>();
+    final newToken = await _authManager.refreshAccessToken(tokens.refreshToken);
+    return _inner.send(requestFactory(newToken));
   }
 }
 ```
 
-## Login Flow
-
-### Complete Login Example
+Usage:
 
 ```dart
-import 'dart:convert';
+final response = await authenticatedClient.send(
+  (token) => http.Request(
+    'GET',
+    Uri.parse('https://api.example.com/albums/1'),
+  )..headers['Authorization'] = 'Bearer $token',
+);
+```
 
+## Login Flow
+
+```dart
 class AuthService {
   final http.Client _client;
   final TokenStorage _tokenStorage;
@@ -323,101 +265,43 @@ class AuthService {
     final response = await _client.post(
       Uri.parse('https://api.example.com/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-      }),
+      body: jsonEncode({'email': email, 'password': password}),
     );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final token = data['token'] as String;
-      final user = User.fromJson(data['user'] as Map<String, dynamic>);
-
-      await _tokenStorage.saveToken(token);
-      return user;
-    } else if (response.statusCode == 401) {
-      throw InvalidCredentialsException();
-    } else {
-      throw Exception('Login failed');
+    if (response.statusCode == 401) {
+      throw const UnauthorizedException('Invalid email or password');
     }
-  }
 
-  Future<void> logout() async {
-    await _tokenStorage.clearToken();
-  }
-}
+    if (response.statusCode != 200) {
+      throw ApiHttpException.fromResponse(response);
+    }
 
-class User {
-  final int id;
-  final String email;
-  final String name;
-
-  User({required this.id, required this.email, required this.name});
-
-  factory User.fromJson(Map<String, dynamic> json) {
-    return User(
-      id: json['id'] as int,
-      email: json['email'] as String,
-      name: json['name'] as String,
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    await _tokenStorage.save(
+      TokenPair(
+        accessToken: data['accessToken'] as String,
+        refreshToken: data['refreshToken'] as String,
+        expiresAt: DateTime.parse(data['expiresAt'] as String),
+      ),
     );
-  }
-}
 
-class InvalidCredentialsException implements Exception {
-  @override
-  String toString() => 'Invalid email or password';
+    return User.fromJson(data['user'] as Map<String, dynamic>);
+  }
 }
 ```
 
 ## OAuth2
 
-### OAuth2 Flow
-
-```dart
-class OAuth2Service {
-  final http.Client _client;
-  final TokenStorage _tokenStorage;
-
-  OAuth2Service(this._client, this._tokenStorage);
-
-  Future<String> authenticate(
-    String clientId,
-    String clientSecret,
-    String code,
-    String redirectUri,
-  ) async {
-    final response = await _client.post(
-      Uri.parse('https://oauth.example.com/token'),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {
-        'grant_type': 'authorization_code',
-        'client_id': clientId,
-        'client_secret': clientSecret,
-        'code': code,
-        'redirect_uri': redirectUri,
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final token = data['access_token'] as String;
-      await _tokenStorage.saveToken(token);
-      return token;
-    } else {
-      throw Exception('OAuth authentication failed');
-    }
-  }
-}
-```
+Use an OAuth2 package or the platform's browser flow for production OAuth. If a
+project already has an OAuth helper, adapt to that helper instead of adding a
+second flow. Never embed client secrets in a mobile app.
 
 ## Best Practices
 
-1. **Store tokens securely** - Use flutter_secure_storage for sensitive tokens
-2. **Refresh tokens** - Implement token refresh before expiration
-3. **Handle 401 errors** - Automatically retry with refreshed token
-4. **Clear tokens on logout** - Remove stored tokens when user logs out
-5. **Use HTTPS** - Never send tokens over unencrypted connections
-6. **Token rotation** - Rotate refresh tokens for better security
-7. **Scope tokens** - Use minimal required scopes
-8. **Error handling** - Provide clear error messages for authentication failures
+1. Store sensitive tokens in secure storage, not `shared_preferences`.
+2. Refresh tokens before expiration and clear storage when refresh fails.
+3. Retry 401s with a newly created request, not an already-sent request object.
+4. Send tokens only over HTTPS or `wss://`.
+5. Keep token values out of logs, analytics, crash reports, screenshots, and
+   source control.
+6. Scope tokens narrowly and follow the backend's rotation policy.

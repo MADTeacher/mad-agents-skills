@@ -26,11 +26,13 @@ dev_dependencies:
 
 ### Generate Mocks
 
-Create mock class with annotation:
+Create a test file with a Mockito annotation and import the generated file:
 
 ```dart
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
+
+import 'user_repository_test.mocks.dart';
 
 @GenerateMocks([ApiClient, UserRepository])
 void main() {}
@@ -39,7 +41,7 @@ void main() {}
 Generate mocks:
 
 ```bash
-flutter pub run build_runner build
+dart run build_runner build
 ```
 
 ### Basic Mocking
@@ -47,6 +49,8 @@ flutter pub run build_runner build
 ```dart
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
+
+import 'my_service_test.mocks.dart';
 
 @GenerateMocks([ApiService])
 void main() {
@@ -82,7 +86,7 @@ class DataService {
   Future<String> fetchData() async => 'real data';
 }
 
-// Test
+// In a real test file, generate MockDataService with @GenerateMocks([DataService]).
 test('mocks class method', () async {
   final mockService = MockDataService();
   
@@ -102,17 +106,25 @@ abstract class Storage {
   String? load(String key);
 }
 
-class MockStorage extends Mock implements Storage {}
+class FakeStorage implements Storage {
+  final values = <String, String>{};
+
+  @override
+  void save(String key, String value) {
+    values[key] = value;
+  }
+
+  @override
+  String? load(String key) => values[key];
+}
 
 // Test
-test('mocks interface methods', () {
-  final mockStorage = MockStorage();
+test('uses a fake storage implementation', () {
+  final storage = FakeStorage();
   
-  mockStorage.save('key', 'value');
-  when(mockStorage.load('key')).thenReturn('value');
+  storage.save('key', 'value');
   
-  expect(mockStorage.load('key'), 'value');
-  verify(mockStorage.save('key', 'value')).called(1);
+  expect(storage.load('key'), 'value');
 });
 ```
 
@@ -198,10 +210,10 @@ await expectLater(mockService.getData(), throwsException);
 ### Conditional Returns
 
 ```dart
-when(mockService.getUser(argThat(isA<String>() && contains('@')))
+when(mockService.getUser(argThat(allOf(isA<String>(), contains('@')))))
   .thenReturn(User(email: 'test@example.com'));
 
-when(mockService.getUser(argThat(predicate((arg) => arg.length > 5)))
+when(mockService.getUser(argThat(predicate<String>((arg) => arg.length > 5))))
   .thenReturn(User(name: 'Long Name'));
 
 // Matches email format
@@ -214,14 +226,12 @@ expect(mockService.getUser('Long Name').name, 'Long Name');
 ### Capturing Arguments
 
 ```dart
-final captured = captureNamed(mockService, 'save');
-
 mockService.save('key1', 'value1');
 mockService.save('key2', 'value2');
 
-verify(mockService.save('key1', 'value1')).called(1);
-expect(captured[0].positionalArguments[0], 'key1');
-expect(captured[1].positionalArguments[1], 'value2');
+final captured = verify(mockService.save(captureAny, captureAny)).captured;
+
+expect(captured, ['key1', 'value1', 'key2', 'value2']);
 ```
 
 ## Verification
@@ -244,9 +254,9 @@ mockService.second();
 mockService.third();
 
 verifyInOrder([
-  verify(mockService.first()).called(1),
-  verify(mockService.second()).called(1),
-  verify(mockService.third()).called(1),
+  mockService.first(),
+  mockService.second(),
+  mockService.third(),
 ]);
 ```
 
@@ -263,8 +273,8 @@ verify(mockService.save(argThat(isA<String>()), any)).called(1);
 
 ```dart
 mockService.getData();
-mockService.getData();
 
+verify(mockService.getData()).called(1);
 verifyNoMoreInteractions(mockService);
 
 verifyNoInteractions(otherMockService);
@@ -349,6 +359,11 @@ test('saves and loads from platform storage', () async {
 ### Data Repository
 
 ```dart
+import 'package:mockito/annotations.dart';
+import 'package:mockito/mockito.dart';
+
+import 'user_repository_test.mocks.dart';
+
 class UserRepository {
   final ApiClient apiClient;
   
@@ -360,7 +375,6 @@ class UserRepository {
   }
 }
 
-// Test
 @GenerateMocks([ApiClient])
 void main() {
   late MockApiClient mockApiClient;
@@ -500,7 +514,7 @@ test('returns sequential responses', () async {
   expect(await mock.fetchData(), 'first');
   expect(await mock.fetchData(), 'second');
   
-  expect(() => mock.fetchData(), throwsException);
+  await expectLater(mock.fetchData(), throwsException);
 });
 ```
 

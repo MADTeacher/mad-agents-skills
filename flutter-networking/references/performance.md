@@ -16,6 +16,8 @@ dependencies:
 ```
 
 ```dart
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -227,20 +229,10 @@ class PageResult<T> {
 
 ## Compression
 
-### Enable Compression
-
-```dart
-Future<Album> fetchAlbum(int id) async {
-  final response = await http.get(
-    Uri.parse('https://api.example.com/albums/$id'),
-    headers: {
-      'Accept-Encoding': 'gzip, deflate, br',
-    },
-  );
-
-  return Album.fromJson(jsonDecode(response.body));
-}
-```
+`package:http` and the underlying platform clients normally negotiate
+compression for you. Do not set `Accept-Encoding` by default unless the app has
+a measured interoperability need and the chosen client stack supports the header
+on the target platforms.
 
 ## Connection Pooling
 
@@ -249,13 +241,13 @@ Future<Album> fetchAlbum(int id) async {
 Create a single HTTP client instance for the app:
 
 ```dart
-class HttpClient {
-  static final HttpClient _instance = HttpClient._internal();
-  factory HttpClient() => _instance;
+class SharedApiClient {
+  static final SharedApiClient _instance = SharedApiClient._internal();
+  factory SharedApiClient() => _instance;
 
   final http.Client _client = http.Client();
 
-  HttpClient._internal();
+  SharedApiClient._internal();
 
   http.Client get client => _client;
 
@@ -265,8 +257,8 @@ class HttpClient {
 }
 
 // Usage
-final httpClient = HttpClient();
-final response = await httpClient.client.get(url);
+final apiClient = SharedApiClient();
+final response = await apiClient.client.get(url);
 ```
 
 ## Optimistic UI
@@ -329,6 +321,10 @@ class NetworkImageLoader {
     }
 
     final response = await http.get(Uri.parse(url));
+    if (response.statusCode != 200) {
+      throw ApiHttpException.fromResponse(response);
+    }
+
     final bytes = response.bodyBytes;
 
     if (_imageCache.length >= _maxCacheSize) {
@@ -347,24 +343,21 @@ class NetworkImageLoader {
 
 ```dart
 class RequestTimer {
-  final Stopwatch _stopwatch = Stopwatch();
-
-  T timeRequest<T>(String name, T Function() request) {
-    _stopwatch.reset();
-    _stopwatch.start();
+  Future<T> timeRequest<T>(String name, Future<T> Function() request) async {
+    final stopwatch = Stopwatch()..start();
 
     try {
-      return request();
+      return await request();
     } finally {
-      _stopwatch.stop();
-      debugPrint('$name took ${_stopwatch.elapsedMilliseconds}ms');
+      stopwatch.stop();
+      debugPrint('$name took ${stopwatch.elapsedMilliseconds}ms');
     }
   }
 }
 
 // Usage
 final timer = RequestTimer();
-final album = timer.timeRequest('fetchAlbum', () => fetchAlbum(1));
+final album = await timer.timeRequest('fetchAlbum', () => fetchAlbum(1));
 ```
 
 ## Best Practices

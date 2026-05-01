@@ -1,6 +1,6 @@
 # Capabilities and Policies
 
-## Design to the strengths of each device type
+## Design to the strengths of each form factor and platform capability
 
 Consider the unique strengths and weaknesses of different devices. Beyond their screen size and inputs, such as touch, mouse, keyboard, what other unique capabilities can you leverage? Flutter enables your code to run on different devices, but strong design is more than just running code. Think about what each platform does best and see if there are unique capabilities to leverage.
 
@@ -27,43 +27,45 @@ Examples of policies include:
 
 ## How to structure policy code
 
-The simplest mechanical way is `Platform.isAndroid`, `Platform.isIOS`, and `kIsWeb`. These APIs mechanically let you know where the code is running but have some problems as the app expands where it can run, and as host platforms add functionality.
+Policy and capability implementations may consult platform APIs, server flags, package configuration, or runtime services. Keep those checks behind named methods so widgets branch on intent instead of raw platform labels. If an implementation needs `dart:io`, isolate it from web builds rather than importing it from shared UI code.
 
 The following guidelines explain best practices when developing the capabilities and policies for your app:
 
-**Avoid using `Platform.isAndroid` and similar functions to make layout decisions or assumptions about what a device can do.**
+**Avoid using platform labels to make layout decisions or assumptions about what a device can do.**
 
 Instead, describe what you want to branch on in a method.
 
-Example: Your app has a link to buy something in a website, but you don't want to show that link on iOS devices for policy reasons.
+Example: Your app has a link to buy something in a website, but a policy decision controls whether that entry point is shown.
 
 ```dart
-bool shouldAllowPurchaseClick() {
-  // Banned by Apple App Store guidelines.
-  return !Platform.isIOS;
-}
+class PurchasePolicy {
+  const PurchasePolicy({required this.externalPurchaseAllowed});
 
-...
-TextSpan(
-  text: 'Buy in browser',
-  style: new TextStyle(color: Colors.blue),
-  recognizer: shouldAllowPurchaseClick ? TapGestureRecognizer()
-    ..onTap = () { launch('<some url>') } : null,
-)
-```
+  final bool externalPurchaseAllowed;
 
-What did you get by adding an additional layer of indirection? The code makes it more clear why the branched path exists. This method can exist directly in the class but it's likely that other parts of code might need this same check. If so, put the code in a class.
-
-```dart
-class Policy {
-  bool shouldAllowPurchaseClick() {
-    // Banned by Apple App Store guidelines.
-    return !Platform.isIOS;
+  bool shouldShowExternalPurchase() {
+    return externalPurchaseAllowed;
   }
 }
+
+Widget buildPurchaseEntryPoint({
+  required PurchasePolicy policy,
+  required VoidCallback openPurchasePage,
+}) {
+  if (!policy.shouldShowExternalPurchase()) {
+    return const SizedBox.shrink();
+  }
+
+  return TextButton(
+    onPressed: openPurchasePage,
+    child: const Text('Buy in browser'),
+  );
+}
 ```
 
-With this code in a class, any widget test can mock `Policy().shouldAllowPurchaseClick` and verify the behavior independently of where the device runs. It also means that later, if you decide that buying on the web isn't the right flow for Android users, you can change the implementation and the tests for clickable text won't need to change.
+What did you get by adding an additional layer of indirection? The code makes it more clear why the branched path exists, and the widget now depends on a named policy decision instead of platform mechanics.
+
+With this code in a class, any widget test can pass a `PurchasePolicy` and verify the behavior independently of where the device runs. It also means that later, if you decide that buying in a browser isn't the right flow for a target, you can change the policy implementation and the tests for purchase UI won't need to change.
 
 ## Capabilities in Detail
 
@@ -89,7 +91,7 @@ RPC-backed policy changes are good for incremental feature rollout or for decisi
 
 Use a `Capability` class to define what the code *can* do. You might check against the existence of an API, OS-enforced restrictions, and physical hardware requirements (like a camera). A capability usually involves compile or runtime checks.
 
-Use a `Policy` class (or classes depending on complexity) to define what the code *should* do to comply with App store guidelines, design preferences, and assets or copy that need to refer to the host device. Policies can be a mix of compile, runtime, or RPC checks.
+Use a `Policy` class (or classes depending on complexity) to define what the code *should* do to comply with App store guidelines, design preferences, and assets or copy that need to refer to the host. Policies can be a mix of compile, runtime, or RPC checks.
 
 Test the branching code by mocking capabilities and policies so that widget tests don't need to change when capabilities or policies change.
 

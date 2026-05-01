@@ -63,7 +63,7 @@ Avoid writing code that checks whether the device you're running on is a "phone"
 
 What space your app is actually given to render in isn't always tied to the full screen size of the device. Flutter can run on many different platforms, and your app might be running in a resizeable window on ChromeOS, side by side with another app on tablets in a multi-window mode, or even in a picture-in-picture on phones. Therefore, device type and app window size aren't really strongly connected.
 
-Instead, use `MediaQuery` to get the size of the window your app is currently running in.
+Instead, use `MediaQuery.sizeOf(context)` or `LayoutBuilder` to get the size your app or widget subtree is currently running in.
 
 ### Support a variety of input devices
 
@@ -79,15 +79,15 @@ For custom widgets, ensure they properly handle:
 
 ### Restore List state
 
-To maintain the scroll position in a list that doesn't change its layout when the device's orientation changes, use the [`PageStorageKey`][] class. `PageStorageKey` persists the widget state in storage after the widget is destroyed and restores state when recreated.
+To maintain the scroll position in a list that doesn't change its layout when the window size or orientation changes, use the [`PageStorageKey`][] class. `PageStorageKey` persists the widget state in storage after the widget is destroyed and restores state when recreated.
 
-If the `List` widget changes its layout when the device's orientation changes, you might have to do a bit of math to change the scroll position on screen rotation.
+If the `List` widget changes its layout when the window size or orientation changes, you might have to do a bit of math to preserve the user's visible position.
 
 ### Save app state
 
 Apps should retain or restore app state as the device rotates, changes window size, or folds and unfolds. By default, an app should maintain state.
 
-If your app loses state during device configuration, verify that the plugins and native extensions that your app uses support the device type, such as a large screen. Some native extensions might lose state when the device changes position.
+If your app loses state during device configuration, verify that the plugins and native extensions that your app uses support the target form factor, such as a large screen. Some native extensions might lose state when the device changes position.
 
 ### Use const widgets whenever possible
 

@@ -1,54 +1,40 @@
 # Web Navigation
 
+Use this reference when fixing Flutter web URLs, browser history, refresh/direct
+load behavior, server rewrites, or non-root hosting.
+
 ## URL Strategies
 
-Flutter web supports two URL strategies for navigation:
+Flutter web supports two URL strategies:
 
-### Hash Strategy (Default)
+### Hash Strategy
 
-**URL format:** `https://example.com/#/path/to/screen`
-
-**Advantages:**
-- No server configuration needed
-- Works with all web servers
-- Simple setup
-
-**Disadvantages:**
-- URLs look less professional
-- Share URLs contain hash
-
-**Setup:**
-```dart
-// No setup required - this is the default
-void main() {
-  runApp(MyApp());
-}
+```text
+https://example.com/#/path/to/screen
 ```
+
+Use it when you cannot configure the web server. Hash URLs avoid server rewrites
+because the route after `#` is not sent to the server.
 
 ### Path Strategy
 
-**URL format:** `https://example.com/path/to/screen`
+```text
+https://example.com/path/to/screen
+```
 
-**Advantages:**
-- Clean, professional URLs
-- Better for SEO
-- More user-friendly for sharing
+Use it when you control server rewrites and want clean, shareable paths.
 
-**Disadvantages:**
-- Requires server configuration
-- More complex setup
-
-**Setup:**
 ```dart
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 void main() {
   usePathUrlStrategy();
-  runApp(MyApp());
+  runApp(const App());
 }
 ```
 
-**Required `pubspec.yaml`:**
+`flutter_web_plugins` is an SDK dependency:
+
 ```yaml
 dependencies:
   flutter:
@@ -57,20 +43,23 @@ dependencies:
     sdk: flutter
 ```
 
-## Server Configuration
+Call `usePathUrlStrategy()` before `runApp()`.
 
-### General SPA Rewrite Rules
+## Server Rewrites
 
-All web servers must rewrite requests to `index.html` for path-based routing:
+Path strategy uses the browser History API. Configure the server to serve
+`index.html` for app routes that are not real files.
 
-**Nginx:**
+### Nginx
+
 ```nginx
 location / {
   try_files $uri $uri/ /index.html;
 }
 ```
 
-**Apache (.htaccess):**
+### Apache
+
 ```apache
 <IfModule mod_rewrite.c>
   RewriteEngine On
@@ -82,23 +71,21 @@ location / {
 </IfModule>
 ```
 
-**Firebase Hosting:**
+### Firebase Hosting
+
 ```json
 {
   "hosting": {
     "public": "build/web",
     "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ],
-    "cleanUrls": true
+      { "source": "**", "destination": "/index.html" }
+    ]
   }
 }
 ```
 
-**Vercel (vercel.json):**
+### Vercel
+
 ```json
 {
   "rewrites": [
@@ -107,107 +94,90 @@ location / {
 }
 ```
 
-**Netlify (_redirects file):**
-```
+### Netlify
+
+```text
 /* /index.html 200
 ```
 
-## Browser History API Integration
+## Browser History
 
-When using go_router or Router API, Flutter integrates with browser History API automatically:
+Router-based navigation, including `go_router`, integrates with the browser URL
+and History API for direct loads, refresh, back, and forward behavior.
 
-### Forward/Back Buttons
-- Browser back button works automatically
-- Browser forward button works automatically
-- History state is managed by go_router
+Prefer canonical route state with `context.go(location)` for browser-visible
+navigation. `context.push(location)` is useful for page-stack style flows, but
+imperative navigation can be harder to reason about in browser history.
 
-### URL Updates
-- URL updates when navigating
-- Deep links work from external sources
-- Bookmarks link to correct state
+Build locations with query parameters using `Uri`:
 
-## Testing Web Navigation
-
-### Local Development
-```bash
-flutter run -d chrome
-# Path strategy works automatically with Flutter dev server
+```dart
+context.go(
+  Uri(
+    path: '/search',
+    queryParameters: {'q': query},
+  ).toString(),
+);
 ```
 
-### Production
-1. Build web app:
-   ```bash
-   flutter build web
-   ```
+## Hosting At A Non-Root Path
 
-2. Configure server with SPA rewrite rules
+If the app is hosted at `https://example.com/myapp/`, update the base href in
+`web/index.html`:
 
-3. Test URLs:
-   - `https://yourdomain.com/`
-   - `https://yourdomain.com/details/123`
-   - `https://yourdomain.com/product/456`
-
-### Common Issues
-
-**404 errors on navigation:**
-- Configure SPA rewrite rules on server
-- Check file paths are correct
-
-**Hash still appearing:**
-- Ensure `usePathUrlStrategy()` called before `runApp()`
-- Check `flutter_web_plugins` is in dependencies
-
-**Browser back button not working:**
-- Use go_router instead of Navigator
-- Ensure Router API is configured
-
-## Hosting at Non-Root Path
-
-If hosting app at subdirectory (e.g., `https://example.com/myapp/`):
-
-### Update base href in web/index.html
 ```html
 <base href="/myapp/">
 ```
 
-### GoRouter configuration
+Keep app route paths app-relative unless the target project already includes the
+deployment prefix in routes:
+
 ```dart
 GoRouter(
-  initialLocation: '/myapp/',
   routes: [
-    GoRoute(path: '/myapp/', builder: (context, state) => HomeScreen()),
-    GoRoute(path: '/myapp/details', builder: (context, state) => DetailsScreen()),
+    GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+    GoRoute(path: '/details/:id', builder: (context, state) => const DetailsScreen()),
   ],
 );
 ```
 
-## Performance Tips
+Configure the hosting server so `/myapp/details/42` rewrites to the built
+`index.html` for that deployed app.
 
-1. **Use lazy loading** for route code splitting:
-   ```dart
-   GoRoute(
-     path: '/heavy-screen',
-     builder: (context, state) => HeavyScreen(),
-     pageBuilder: (context, state) => MaterialPage(
-       key: state.pageKey,
-       child: HeavyScreen(),
-     ),
-   )
-   ```
+## Not Found And Error Routes
 
-2. **Preload routes** for better UX:
-   ```dart
-   // Preload in background
-   WidgetsBinding.instance.addPostFrameCallback((_) {
-     GoRouter.of(context).preloadRoutes();
-   });
-   ```
+For public web URLs, define a deliberate not-found or error surface:
 
-3. **Minimize route parameters** - prefer query params for optional data
+```dart
+GoRouter(
+  errorBuilder: (context, state) => NotFoundScreen(error: state.error),
+  routes: [
+    // ...
+  ],
+);
+```
 
-## Accessibility
+Validate bad routes and malformed parameters. Do not let a bad URL crash during
+`int.parse`, forced casts, or missing path parameter access.
 
-- Ensure keyboard navigation works
-- Test with screen readers
-- Provide meaningful page titles
-- Use semantic HTML when possible
+## Web Validation
+
+When feasible, run the app in Chrome and test:
+
+- direct load of `/`;
+- direct load of every changed route;
+- refresh on every changed route;
+- browser back and forward;
+- query parameter preservation;
+- unknown URL and malformed parameter behavior;
+- deployed non-root path if applicable.
+
+For production hosts, test after deployment as well as on the Flutter dev
+server. The dev server handles fallback routing automatically, while production
+hosting only works if rewrites are configured.
+
+## Accessibility And Titles
+
+Navigation changes can affect focus, page announcements, and keyboard flow.
+After route changes, check that keyboard users can reach primary actions and
+that screen names, app bars, or semantic labels make the destination clear.

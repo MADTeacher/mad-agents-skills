@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -24,7 +23,7 @@ class Album {
 Future<Album> fetchAlbum(String token, int id) async {
   final response = await http.get(
     Uri.parse('https://jsonplaceholder.typicode.com/albums/$id'),
-    headers: {HttpHeaders.authorizationHeader: 'Bearer $token'},
+    headers: {'Authorization': 'Bearer $token'},
   );
 
   if (response.statusCode == 200) {
@@ -55,7 +54,7 @@ class _AuthExampleState extends State<AuthExample> {
   @override
   void initState() {
     super.initState();
-    futureAlbum = Future.error('Please enter a token');
+    futureAlbum = Future<Album>.error('Please enter a token');
   }
 
   @override
@@ -120,5 +119,11 @@ class _AuthExampleState extends State<AuthExample> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _tokenController.dispose();
+    super.dispose();
   }
 }

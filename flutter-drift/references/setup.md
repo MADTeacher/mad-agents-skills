@@ -1,69 +1,140 @@
 ---
 title: Setup
-description: Setup drift for Flutter applications
+description: Set up Drift for Flutter applications with drift_flutter
 ---
 
 ## Dependencies
 
-Add drift to your `pubspec.yaml`:
-
-```yaml
-dependencies:
-  drift: ^2.30.0
-  drift_flutter: ^0.2.8
-  path_provider: ^2.1.5
-
-dev_dependencies:
-  drift_dev: ^2.30.0
-  build_runner: ^2.10.4
-```
-
-Or run:
+Prefer package commands so the project resolves current compatible versions:
 
 ```bash
 dart pub add drift drift_flutter path_provider dev:drift_dev dev:build_runner
 ```
 
-## Web Support
+Use `flutter pub add` instead of `dart pub add` if that is the local project convention.
 
-Running sqlite3 on the web requires additional sources that must be downloaded into the `web/` folder:
-- `sqlite3.wasm` module
-- `drift_worker.js` worker
+If a document must pin versions, verify them against pub.dev first. At the time this skill was revised, current package pages showed:
 
-Obtain these files and place them in your `web/` directory.
+- `drift: ^2.32.1`
+- `drift_dev: ^2.32.1`
+- `drift_flutter: ^0.3.0`
+- `build_runner: ^2.15.0`
 
-## Database Class
+## Canonical Database
 
-Every Flutter app using drift needs a database class. Create a `database.dart` file:
+Create `lib/database.dart` or follow the app's existing database module layout.
 
 ```dart
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-// Define tables
-class TodoItems extends Table {
+@DataClassName('TodoCategory')
+class Categories extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get title => text()();
-  DateTimeColumn get createdAt => dateTime().nullable()();
+  TextColumn get name => text().withLength(min: 1, max: 80)();
 }
 
-@DriftDatabase(tables: [TodoItems])
+class TodoItems extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text().withLength(min: 1, max: 120)();
+  TextColumn get content => text().nullable()();
+  BoolColumn get isCompleted =>
+      boolean().withDefault(const Constant(false))();
+  IntColumn get priority => integer().withDefault(const Constant(0))();
+  IntColumn get category =>
+      integer().nullable().references(Categories, #id)();
+  DateTimeColumn get createdAt =>
+      dateTime().withDefault(currentDateAndTime)();
+}
+
+@DriftDatabase(tables: [Categories, TodoItems])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase([QueryExecutor? e])
+  AppDatabase([QueryExecutor? executor])
+      : super(executor ?? _openConnection());
+
+  static QueryExecutor _openConnection() {
+    return driftDatabase(
+      name: 'app_db',
+      native: const DriftNativeOptions(
+        databaseDirectory: getApplicationSupportDirectory,
+      ),
+      web: DriftWebOptions(
+        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+        driftWorker: Uri.parse('drift_worker.js'),
+      ),
+    );
+  }
+
+  @override
+  int get schemaVersion => 1;
+}
+```
+
+Run the generator:
+
+```bash
+dart run build_runner build
+```
+
+Use watch mode during active development:
+
+```bash
+dart run build_runner watch
+```
+
+## Web Support
+
+Flutter web needs the sqlite3 WASM module and Drift worker in `web/`:
+
+- `sqlite3.wasm`
+- `drift_worker.js`
+
+Do not claim web support is complete until those assets are present and the app has been tested in a browser.
+
+## Manual Database Setup
+
+Use manual setup only when `driftDatabase` is not flexible enough.
+
+```dart
+import 'dart:io';
+
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:sqlite3/sqlite3.dart';
+
+QueryExecutor openConnection() {
+  return LazyDatabase(() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'app_db.sqlite'));
+
+    final cacheBase = (await getTemporaryDirectory()).path;
+    sqlite3.tempDirectory = cacheBase;
+
+    return NativeDatabase.createInBackground(file);
+  });
+}
+```
+
+## Isolate Sharing
+
+Enable `shareAcrossIsolates` only when multiple isolates must access the same database, such as foreground app code plus background work.
+
+```dart
+@DriftDatabase(tables: [Categories, TodoItems])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase.defaults()
       : super(
-          e ??
-              driftDatabase(
-                name: 'app_db',
-                native: const DriftNativeOptions(
-                  databaseDirectory: getApplicationSupportDirectory,
-                ),
-                web: DriftWebOptions(
-                  sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-                  driftWorker: Uri.parse('drift_worker.js'),
-                ),
-              ),
+          driftDatabase(
+            name: 'app_db',
+            native: const DriftNativeOptions(
+              shareAcrossIsolates: true,
+            ),
+          ),
         );
 
   @override
@@ -71,55 +142,14 @@ class AppDatabase extends _$AppDatabase {
 }
 ```
 
-## Manual Database Setup
+When isolate sharing is enabled, always close database instances explicitly so the shared server can shut down.
 
-If you need more control over database opening:
+## Testing Setup
+
+Keep the constructor injectable so tests can use an in-memory executor:
 
 ```dart
-import 'package:drift/drift.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
-
-Future<DatabaseConnection> openConnection() async {
-  final dbFolder = await getApplicationDocumentsDirectory();
-  final file = File(p.join(dbFolder.path, 'db.sqlite'));
-
-  if (Platform.isAndroid) {
-    await applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
-  }
-
-  final cachebase = await getTemporaryDirectory();
-  await sqlite3FlutterLibsInit();
-
-  return NativeDatabase.createInBackground(file);
+AppDatabase createTestDatabase() {
+  return AppDatabase(NativeDatabase.memory());
 }
-```
-
-## Sharing Databases Between Isolates
-
-Enable isolate sharing:
-
-```dart
-AppDatabase.defaults(): super(
-  driftDatabase(
-    name: 'app_db',
-    native: DriftNativeOptions(
-      shareAcrossIsolates: true,
-    ),
-  ),
-);
-```
-
-## Running the Code Generator
-
-Generate code with build_runner:
-
-```bash
-dart run build_runner build
-```
-
-Or watch for changes during development:
-
-```bash
-dart run build_runner watch
 ```

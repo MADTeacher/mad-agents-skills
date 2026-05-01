@@ -268,9 +268,7 @@ test('divide throws with specific message', () {
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 
-// Generate mocks with: flutter pub run build_runner build
-
-class MockApiClient extends Mock implements ApiClient {}
+import 'user_service_test.mocks.dart';
 
 @GenerateMocks([ApiClient])
 void main() {
@@ -294,6 +292,12 @@ void main() {
     });
   });
 }
+```
+
+Generate the mock file with:
+
+```bash
+dart run build_runner build
 ```
 
 ### Manual Mocking

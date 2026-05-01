@@ -128,10 +128,14 @@ class _WebSocketDemoState extends State<WebSocketDemo> {
 ### Handling Connection States
 
 ```dart
-enum ConnectionState { connecting, connected, disconnected, error }
+import 'dart:async';
+
+enum SocketConnectionStatus { connecting, connected, disconnected, error }
 
 class _WebSocketDemoState extends State<WebSocketDemo> {
-  ConnectionState _connectionState = ConnectionState.connecting;
+  WebSocketChannel? _channel;
+  StreamSubscription<dynamic>? _subscription;
+  SocketConnectionStatus _connectionStatus = SocketConnectionStatus.connecting;
   String _errorMessage = '';
 
   @override
@@ -144,32 +148,43 @@ class _WebSocketDemoState extends State<WebSocketDemo> {
     try {
       final channel = WebSocketChannel.connect(Uri.parse('wss://example.com/ws'));
 
-      channel.stream.listen(
+      _subscription = channel.stream.listen(
         (data) {
+          if (!mounted) return;
           setState(() {
-            _connectionState = ConnectionState.connected;
+            _connectionStatus = SocketConnectionStatus.connected;
           });
         },
         onError: (error) {
+          if (!mounted) return;
           setState(() {
-            _connectionState = ConnectionState.error;
+            _connectionStatus = SocketConnectionStatus.error;
             _errorMessage = error.toString();
           });
         },
         onDone: () {
+          if (!mounted) return;
           setState(() {
-            _connectionState = ConnectionState.disconnected;
+            _connectionStatus = SocketConnectionStatus.disconnected;
           });
         },
       );
 
       _channel = channel;
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _connectionState = ConnectionState.error;
+        _connectionStatus = SocketConnectionStatus.error;
         _errorMessage = e.toString();
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    _channel?.sink.close();
+    super.dispose();
   }
 }
 ```
@@ -181,6 +196,7 @@ class _WebSocketDemoState extends State<WebSocketDemo> {
 ```dart
 class _WebSocketDemoState extends State<WebSocketDemo> {
   WebSocketChannel? _channel;
+  StreamSubscription<dynamic>? _subscription;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
@@ -189,7 +205,8 @@ class _WebSocketDemoState extends State<WebSocketDemo> {
     try {
       _channel = WebSocketChannel.connect(Uri.parse('wss://example.com/ws'));
 
-      _channel!.stream.listen(
+      _subscription?.cancel();
+      _subscription = _channel!.stream.listen(
         (data) {
           _reconnectAttempts = 0;
         },
@@ -206,6 +223,7 @@ class _WebSocketDemoState extends State<WebSocketDemo> {
   }
 
   void _scheduleReconnect() {
+    if (!mounted) return;
     if (_reconnectAttempts >= _maxReconnectAttempts) {
       return;
     }
@@ -215,6 +233,7 @@ class _WebSocketDemoState extends State<WebSocketDemo> {
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(delay, () {
+      if (!mounted) return;
       _connect();
     });
   }
@@ -222,6 +241,7 @@ class _WebSocketDemoState extends State<WebSocketDemo> {
   @override
   void dispose() {
     _reconnectTimer?.cancel();
+    _subscription?.cancel();
     _channel?.sink.close();
     super.dispose();
   }
@@ -335,6 +355,10 @@ void _connectWithToken(String token) {
 ```
 
 ### Sending Auth Header
+
+`IOWebSocketChannel` works on IO platforms only. For Flutter web, use query
+parameters, cookies, or an application-level auth message after connecting,
+depending on the backend contract.
 
 ```dart
 import 'package:web_socket_channel/io.dart';

@@ -1,394 +1,151 @@
 ---
 name: flutter-duit-bdui
-description: Integrate Duit framework into Flutter applications including setup, driver configuration, HTTP/WebSocket transports, custom widgets, and themes. Use when integrating backend-driven UI, configuring Duit, or adding Duit to Flutter applications.
+description: >-
+  Integrate, fix, review, migrate, test, or debug Duit / flutter_duit
+  backend-driven UI in Flutter applications. Use when a task mentions DUIT,
+  flutter_duit, backend-driven UI, BDUI, server-driven UI, XDriver,
+  DuitViewHost, DuitRegistry, HTTP or WebSocket transports, custom Duit
+  widgets, components, capability delegates, compile-time DUIT flags, or
+  rendering JSON layouts from a backend.
 ---
 
-# Fluttter Duit Backend-driven UI
+# Flutter Duit Backend-Driven UI
 
-## Overview
+You are a Flutter BDUI integration engineer for Duit and `flutter_duit`.
 
-Duit enables backend-driven UI in Flutter applications. The server controls both data and layout via JSON, allowing UI updates without app releases.
+## Principle 0
 
-## Quick Start
+`flutter_duit` has changed its public API across major versions. Do not write
+driver, transport, registry, or widget-host code from memory. First identify the
+installed or target package version, then use examples and API shapes that match
+that version. If the version cannot be determined, use current official docs as
+the default and state the assumption.
 
-1. Add dependency to pubspec.yaml
-2. Initialize DuitRegistry (optional: with themes/custom widgets)
-3. Create XDriver (HTTP, WebSocket, or static)
-4. Wrap UI in DuitViewHost
-5. Server sends JSON layouts → Duit renders them
+## Workflow
 
-## Prerequisites
+1. Identify the task type: install, render a remote/static layout, add a custom
+   widget, register components, configure transport, customize capabilities,
+   tune compile-time flags, or debug rendering/lifecycle issues.
+2. Inspect the target Flutter project before editing: `pubspec.yaml`,
+   `pubspec.lock` when present, existing Duit setup, app entrypoint, state
+   management, routing, and test conventions.
+3. Determine the `flutter_duit` version:
+   - Prefer `pubspec.lock` or the existing dependency constraint.
+   - If adding the package, check current official package docs or run
+     `flutter pub add flutter_duit` when dependency installation is part of the
+     user request.
+   - If the package major version is not 4.x, verify API names before using any
+     examples from this skill.
+4. Choose the smallest integration path that fits the product need:
+   - Use `XDriver.remote` for backend-driven screens loaded from a server.
+   - Use `XDriver.static` for local JSON, tests, previews, or offline fixtures.
+   - Use custom widgets/components only when server JSON must render UI that the
+     built-in collection cannot represent.
+   - Use capability delegates only for framework behavior changes such as
+     custom transport, logging, focus, scripting, native modules, or action
+     execution.
+5. Read only the routed resources needed for the scenario.
+6. Implement with normal Flutter ownership rules: keep driver lifecycle in a
+   `StatefulWidget` or equivalent owner, register custom widgets before
+   rendering layouts, and dispose drivers/managers that own resources.
+7. Validate in the target project. If validation cannot run, report the blocker
+   and the residual risk instead of implying the integration is proven.
 
-### SDK Requirements
+## Current 4.x API Guardrail
 
-```yaml
-- Dart SDK: >=3.4.4 <4.0.0
-- Flutter: >=3.24.0
-```
-
-### Add Dependency
-
-```bash
-flutter pub add flutter_duit
-```
-
-Install:
-
-```bash
-flutter pub get
-```
-
-## Basic Integration
-
-### Minimal Setup
-
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_duit/flutter_duit.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        body: DuitViewHost.withDriver(
-          driver: XDriver.static({
-            "type": "Text",
-            "id": "1",
-            "attributes": {"data": "Hello, World!"},
-          }),
-        ),
-      ),
-    );
-  }
-}
-```
-
-### Driver Lifecycle Management
-
-Always dispose drivers to prevent memory leaks:
+For `flutter_duit` 4.x, prefer the public shapes shown by current package
+examples:
 
 ```dart
-class MyWidgetState extends State<MyWidget> {
-  late final XDriver driver;
-
-  @override
-  void initState() {
-    super.initState();
-    driver = XDriver.static(/* ... */);
-  }
-
-  @override
-  void dispose() {
-    driver.dispose();
-    super.dispose();
-  }
-}
-```
-
-## Transport Configuration
-
-### HTTP Transport
-
-Fetch layouts from REST API endpoints:
-
-```dart
-final driver = XDriver(
+final driver = XDriver.remote(
   transportManager: HttpTransportManager(
-    options: HttpTransportOptions(
-      baseUrl: 'https://api.example.com/view',
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    ),
+    url: "/layout",
+    baseUrl: "http://localhost:3000",
+    defaultHeaders: {
+      "Content-Type": "application/json",
+    },
   ),
 );
 ```
-
-### WebSocket Transport
-
-Real-time bidirectional communication:
 
 ```dart
-final driver = XDriver(
-  transportManager: WSTransportManager(
-    options: WSTransportOptions(
-      url: 'wss://api.example.com/ws',
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
-      reconnectInterval: Duration(seconds: 5),
-      heartbeatInterval: Duration(seconds: 30),
-    ),
-  ),
+DuitViewHost.withDriver(
+  driver: driver,
+  placeholder: const CircularProgressIndicator(),
 );
 ```
-
-### Static/Stub Transport
-
-For testing or local layouts:
 
 ```dart
 final driver = XDriver.static(
-  layoutJson,
-);
-```
-
-### Custom Decoder/Encoder
-
-```dart
-import 'dart:convert';
-import 'dart:typed_data';
-
-class CustomDecoder extends Converter<Uint8List, Map<String, dynamic>> {
-  @override
-  Map<String, dynamic> convert(Uint8List input) {
-    // Custom decode logic
-    return jsonDecode(utf8.decode(input));
-  }
-}
-
-final driver = XDriver(
-  transportManager: HttpTransportManager(
-    options: HttpTransportOptions(
-      baseUrl: 'https://api.example.com',
-      decoder: CustomDecoder(),
-    ),
-  ),
-);
-```
-
-### Custom Transport
-
-Create your own transport implementation if needed:
-
-```dart
-class MyCustomTransportManager with TransportCapabilityDelegate {
-  @override
-  void linkDriver(UIDriver driver) {
-    // Implement linkDriver method
-  }
-
-  @override
-  Stream<Map<String, dynamic>> connect({
-    Map<String, dynamic>? initialRequestData,
-    Map<String, dynamic>? staticContent,
-  }) async* {
-    // Implement connect method
-  }
-
-  @override
-  Future<Map<String, dynamic>?> executeRemoteAction(
-    ServerAction action,
-    Map<String, dynamic> payload,
-  ) async {
-    //Implement executeRemoteAction method
-  }
-
-  @override
-  Future<Map<String, dynamic>?> request(
-    String url,
-    Map<String, dynamic> meta,
-    Map<String, dynamic> body,
-  ) async {
-    //Implement request method
-  }
-
-  @override
-  void releaseResources() {
-    // Implement linkDriver method
-  }
-}
-```
-
-## Custom Widgets
-
-### Create and register Custom Widget
-
-```dart
-import 'package:flutter_duit/flutter_duit.dart';
-
-// 1. Define custom widget
-class MyCustomWidget extends StatelessWidget {
-  final ViewAttribute attributes;
-
-  const MyCustomWidget({
-    required this.attributes,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final attrs = attributes.payload;
-    return Container(
-      child: Text(attrs.getString(key: "message")),
-    );
-  }
-}
-
-// 2. Create build factory fn for widget
-Widget myCustomBuildFactory(ElementPropertyView model) {
-    if (model.isControlled) {
-        return MyCustomWidget(
-            attributes: model.attributes,
-        );
-    } else {
-        return const SizedBox.shrink();
-    }
-}
-
-// 3. Register build-fn
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  DuitRegistry.register(
-    "MyCustomWidget",
-    buildFactory: myCustomBuildFactory,
-  );
-
-  runApp(const MyApp());
-}
-```
-
-## Components
-
-### Components registration
-
-Components allow you to create reusable UI templates that can be referenced by a tag and populated with dynamic data.
-
-```dart
-import 'package:flutter_duit/flutter_duit.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Define component template
-  final cardComponent = {
-    "tag": "CardComponent",
-    "layoutRoot": {
-      "type": "Container",
-      "id": "cardContainer",
-      "controlled": false,
-      "attributes": {
-        "padding": {"all": 16},
-        "margin": {"all": 8},
-        "decoration": {
-          "borderRadius": 12,
-          "color": "#FFFFFF",
-          "boxShadow": [
-            {
-              "color": "#00000033",
-              "blurRadius": 6,
-              "offset": {"dx": 0, "dy": 2},
-            },
-          ],
-        },
-      },
-      "children": [
-        {
-          "type": "Text",
-          "id": "cardTitle",
-          "controlled": false,
-          "attributes": {
-            "data": {
-              "style": {
-                "fontSize": 18,
-                "fontWeight": "w600",
-                "color": "#333333",
-              },
-            },
-            "refs": [
-              {
-                "objectKey": "title",
-                "attributeKey": "data",
-              },
-            ],
-          },
-        },
-        {
-          "type": "Text",
-          "id": "cardDescription",
-          "controlled": false,
-          "attributes": {
-            "data": {
-              "style": {
-                "fontSize": 14,
-                "color": "#666666",
-              },
-            },
-            "refs": [
-              {
-                "objectKey": "description",
-                "attributeKey": "data",
-              },
-            ],
-          },
-        },
-      ],
+  {
+    "type": "Text",
+    "id": "1",
+    "attributes": {
+      "data": "Hello, World!",
     },
-  };
-
-  // Register the component
-  await DuitRegistry.registerComponents([cardComponent]);
-
-  runApp(const MyApp());
-}
-
-// Usage in JSON layout from server:
-// {
-//   "type": "Component",
-//   "id": "card1",
-//   "tag": "CardComponent",
-//   "data": {
-//     "title": "Hello World",
-//     "description": "This is a card component"
-//   }
-// }
+  },
+  transportManager: StubTransportManager(),
+);
 ```
 
-**Key concepts:**
+Do not use older or unverified constructor shapes such as
+`XDriver(...)`, `HttpTransportManager(options: ...)`, `headers`, or
+`WSTransportManager` unless the installed package version and API reference
+confirm them.
 
-- **tag**: Unique identifier for the component
-- **layoutRoot**: Root element of the component template
-- **refs**: References to dynamic data passed via the `data` field
-- **objectKey**: Key in the `data` object
-- **attributeKey**: Attribute in the widget to bind to
-- **defaultValue**: Optional default value if data key is missing
+## Resource Routing
 
-You can register multiple components at once:
+| Task | Read | Why |
+|---|---|---|
+| Driver lifecycle, remote/static/native mode, event streams, or public methods | `references/public_api.md` | Version-aware API contracts and 4.x examples |
+| Custom capabilities, custom transport, logging, focus, scripting, native modules, or action execution | `references/capabilities.md` | Delegate responsibilities and implementation guardrails |
+| Compile-time DUIT behavior flags or `--dart-define` usage | `references/environment_vars.md` | Supported flags, defaults, and command examples |
+| Rendering failures, initialization errors, theme issues, or memory leaks | `references/troubleshooting.md` | Symptom-to-action debugging checklist |
 
-```dart
-await DuitRegistry.registerComponents([
-  cardComponent,
-  buttonComponent,
-  listItemComponent,
-]);
-```
+External sources to verify when API details matter:
 
-## When to Use This Skill
+- `https://pub.dev/packages/flutter_duit`
+- `https://pub.dev/documentation/flutter_duit/latest/`
+- `https://github.com/Duit-Foundation/flutter_duit`
+- `https://www.duit.pro/docs/`
 
-Use this skill when:
+## Constraints
 
-- Integration flutter_duit library into project
-- Custom widet creation
-- Components registration
-- Basic framework behavior overriding via capabilities implementation
-- Need help with the framework API
+- Do not invent server JSON schema, action payloads, event formats, or widget
+  attributes. Inspect existing backend contracts, fixtures, docs, or tests.
+- Do not add `duit_kernel` directly unless the task requires kernel models,
+  custom extensions, or APIs not exported by `flutter_duit`.
+- Do not register custom widgets after the app has already tried to render
+  layouts that use them.
+- Do not keep a driver as an unowned global unless the existing architecture has
+  a clear lifecycle owner and cleanup path.
+- Do not silently downgrade unknown widget behavior in development. Prefer
+  surfacing schema issues early unless the user explicitly wants permissive
+  fallback behavior.
+- Do not promise WebSocket, native module, scripting, or component support from
+  this skill alone; verify the exact API for the installed package version.
 
-## Resources
+## Validation
 
-### Reference Documentation
+Run the strongest available validation for the target project:
 
-- [capabilities.md](./references/capabiliteis.md) — Notes about capability-based design and core framework parts overriding
-- [troubleshooting.md](./references/troubleshooting.md) - Notes about common issues in framework integration
-- [environvent_vars.md](./references//environment_vars.md) — Notes about avalilable env variables and its usage
-- [public_api.md](./references/public_api.md) — Notes about driver public API
-- <https://duit.pro/docs/en> — official documentation site
+1. `flutter pub get` after dependency changes.
+2. `dart format` on edited Dart files.
+3. `flutter analyze` for Flutter projects.
+4. Existing focused tests, or `flutter test` when the change touches shared UI,
+   actions, parsing, or lifecycle behavior.
+5. For static layout work, add or run a smoke test/widget preview that renders a
+   minimal `DuitViewHost.withDriver`.
+6. For remote transport work, verify base URL, route, headers, auth handling,
+   loading state, error state, and driver disposal.
+
+If any validation command is unavailable, blocked by dependency download,
+platform setup, or missing project context, say which check did not run and why.
+
+## Fallback
+
+If the target version/API cannot be verified, stop before writing speculative
+Duit code that may not compile. Ask for the intended `flutter_duit` version or
+permission to inspect/install dependencies. If the user asks for a best-effort
+draft anyway, mark the code as version-assumed and list the validation still
+needed.

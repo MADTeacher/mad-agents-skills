@@ -14,20 +14,20 @@ Encapsulates actions as objects with state management and Result handling.
 
 ### Implementation
 
-See `command.dart` asset for template implementation.
+See `command.dart` asset for template implementation. Adapt imports and naming
+to the target project before copying it into app code.
 
 **Usage:**
 
 ```dart
 class MyViewModel extends ChangeNotifier {
   // Command without arguments
-  final _loadDataCommand = Command0<void>(_loadData);
+  Command0<void> get loadData => _loadDataCommand;
+  late final _loadDataCommand = Command0<void>(_loadData);
 
   // Command with one argument
-  final _saveCommand = Command1<void, String>(_saveItem);
-
-  Command0<void> get loadData => _loadDataCommand;
   Command1<void, String> get saveItem => _saveCommand;
+  late final _saveCommand = Command1<void, String>(_saveItem);
 
   Future<Result<void>> _loadData() async {
     // Logic here
@@ -79,7 +79,8 @@ Type-safe error handling without exceptions.
 
 ### Implementation
 
-See `result.dart` asset for template implementation.
+See `result.dart` asset for template implementation. Use it only when the app
+does not already have an equivalent typed error/result abstraction.
 
 **Usage:**
 
@@ -154,15 +155,15 @@ class TodoRepository {
     }
   }
 
-  Future<Result<void>> addTodo(Todo todo) async {
+  Future<Result<Todo>> addTodo(Todo todo) async {
     try {
-      await _apiService.createTodo(todo);
-      await _databaseService.saveTodo(todo);
-      final updated = [..._todos.value, todo];
+      final savedTodo = await _apiService.createTodo(todo);
+      await _databaseService.saveTodo(savedTodo);
+      final updated = [..._todos.value, savedTodo];
       _todos.add(updated);
-      return Result.ok(null);
+      return Result.ok(savedTodo);
     } catch (e) {
-      return Result.error(e);
+      return Result.error(e is Exception ? e : Exception(e.toString()));
     }
   }
 }
@@ -194,9 +195,10 @@ class TodoViewModel extends ChangeNotifier {
 
   List<Todo> get todos => _todos;
 
-  Command0<void> get addTodo => Command0<void>(_executeAddTodo);
+  Command0<Todo> get addTodo => _addTodoCommand;
+  late final _addTodoCommand = Command0<Todo>(_executeAddTodo);
 
-  Future<Result<void>> _executeAddTodo() async {
+  Future<Result<Todo>> _executeAddTodo() async {
     // Optimistic update
     final tempTodo = Todo(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -221,7 +223,7 @@ class TodoViewModel extends ChangeNotifier {
     _todos = _todos.map((t) => t.id == tempTodo.id ? serverTodo : t).toList();
     notifyListeners();
 
-    return Result.ok(null);
+    return Result.ok(serverTodo);
   }
 }
 ```
@@ -262,26 +264,29 @@ class TodoRepository {
   Future<void> sync() async {
     if (!await _hasConnection()) return;
 
-    final local = await _local.getTodos();
     final remote = await _api.getTodos();
 
     // Conflict resolution: remote wins
     await _local.saveTodos(remote);
   }
 
-  Future<Result<void>> addTodo(Todo todo) async {
+  Future<Result<Todo>> addTodo(Todo todo) async {
     // Save locally first (offline support)
     await _local.saveTodo(todo);
 
     // Sync when online
     if (await _hasConnection()) {
       final result = await _api.createTodo(todo);
-      if (result case Ok()) {
-        await _local.saveTodo(result.asOk.value);
+      switch (result) {
+        case Ok<Todo>():
+          await _local.saveTodo(result.value);
+          return result;
+        case Error<Todo>():
+          return result;
       }
     }
 
-    return Result.ok(null);
+    return Result.ok(todo);
   }
 }
 ```

@@ -1,26 +1,23 @@
 ---
 title: PostgreSQL
-description: Use drift with PostgreSQL
+description: Use Drift with PostgreSQL in non-Flutter Dart apps
 ---
 
-## Setup
+# PostgreSQL
 
-Add PostgreSQL dependencies:
+Use this reference for `drift_postgres`, `package:postgres`, PostgreSQL custom
+types, pooling, and Postgres-specific caveats.
 
-```yaml
-dependencies:
-  drift: ^2.14.0
-  postgres: ^2.6.0
-  drift_postgres: ^1.2.0
+## Dependencies
 
-dev_dependencies:
-  drift_dev: ^2.14.0
-  build_runner: ^2.4.0
+Prefer commands:
+
+```bash
+dart pub add drift drift_postgres postgres
+dart pub add dev:drift_dev dev:build_runner
 ```
 
-## Configure Postgres Dialect
-
-Add to `build.yaml`:
+Enable PostgreSQL SQL generation in `build.yaml`:
 
 ```yaml
 targets:
@@ -30,343 +27,203 @@ targets:
         options:
           sql:
             dialects:
+              - sqlite
               - postgres
 ```
 
-## Database Connection
+Remove `sqlite` from the dialect list only when the database will never target
+SQLite.
 
-### Simple Connection
+## Basic Database
 
 ```dart
 import 'package:drift/drift.dart';
 import 'package:drift_postgres/drift_postgres.dart';
-import 'package:postgres/postgres.dart';
+import 'package:postgres/postgres.dart' as pg;
 
-@DriftDatabase(...)
+part 'postgres_database.g.dart';
+
+class Users extends Table {
+  UuidColumn get id => customType(PgTypes.uuid).withDefault(genRandomUuid())();
+  TextColumn get name => text()();
+  JsonColumn get settings => customType(PgTypes.jsonb)();
+  TimestampColumn get createdAt =>
+      customType(PgTypes.timestampWithTimezone).withDefault(now())();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [Users])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase(QueryExecutor e) : super(e);
+  AppDatabase(super.executor);
 
   @override
   int get schemaVersion => 1;
 }
-
-Future<AppDatabase> openPostgresConnection() {
-  final endpoint = HostEndpoint(
-      host: 'localhost',
-      port: 5432,
-      database: 'mydb',
-      username: 'user',
-      password: 'password',
-    );
-
-  return AppDatabase(
-    PgDatabase(
-      endpoint: endpoint,
-    ),
-  );
-}
 ```
 
-### Connection Pool
+## Single Connection
 
 ```dart
-import 'package:postgres/postgres_pool.dart';
-
-Future<AppDatabase> openPooledConnection() {
-  final pool = PgPool(
-      PgEndpoint(
+AppDatabase openPostgresDatabase() {
+  return AppDatabase(
+    PgDatabase(
+      endpoint: pg.Endpoint(
         host: 'localhost',
-        port: 5432,
         database: 'mydb',
         username: 'user',
         password: 'password',
       ),
-      settings: PoolSettings(
-        maxSize: 10,
-      ),
-    );
-
-  return AppDatabase(PgDatabase.opened(pool));
-}
-```
-
-### Custom Session
-
-Use existing PostgreSQL session:
-
-```dart
-import 'package:postgres/postgres.dart';
-
-Future<AppDatabase> openCustomConnection(Session session) {
-  return AppDatabase(PgDatabase.opened(session));
-}
-```
-
-### Connection Settings
-
-Configure timeouts and options:
-
-```dart
-final endpoint = HostEndpoint(
-    host: 'localhost',
-    port: 5432,
-    database: 'mydb',
-    username: 'user',
-    password: 'password',
-  );
-
-return AppDatabase(
-    PgDatabase(
-      endpoint: endpoint,
-      settings: ConnectionSettings(
-        connectTimeout: Duration(seconds: 10),
-        queryTimeout: Duration(seconds: 30),
-        applicationName: 'My Drift App',
+      settings: pg.ConnectionSettings(
+        sslMode: pg.SslMode.disable,
+        connectTimeout: const Duration(seconds: 10),
+        queryTimeout: const Duration(seconds: 30),
+        applicationName: 'my-dart-service',
       ),
     ),
   );
 }
 ```
 
-## PostgreSQL Types
+Use `pg.SslMode.verifyFull` or another production-appropriate SSL mode for
+public network connections.
 
-### UUID Column
+## Connection Pooling
+
+Use `pg.Pool.withEndpoints` for services:
 
 ```dart
-class Users extends Table {
-  late final id = postgresUuid().autoGenerate()();
-  late final name = text()();
+final pool = pg.Pool.withEndpoints(
+  [
+    pg.Endpoint(
+      host: 'localhost',
+      database: 'mydb',
+      username: 'user',
+      password: 'password',
+    ),
+  ],
+  settings: pg.PoolSettings(
+    maxConnectionCount: 20,
+    maxConnectionAge: const Duration(hours: 1),
+    applicationName: 'my-dart-service',
+  ),
+);
+
+final db = AppDatabase(PgDatabase.opened(pool));
+```
+
+Close both layers:
+
+```dart
+await db.close();
+await pool.close();
+```
+
+Do not use old examples based on `postgres_pool.dart`, `PgPool`, or
+`PgEndpoint`.
+
+## Custom Types
+
+`drift_postgres` exposes `PgTypes`:
+
+```dart
+class Events extends Table {
+  UuidColumn get id => customType(PgTypes.uuid).withDefault(genRandomUuid())();
+  JsonColumn get payload => customType(PgTypes.jsonb)();
+  Column<List<String>> get tags => customType(PgTypes.textArray)();
+  PgDateColumn get eventDate => customType(PgTypes.date)();
+  TimestampColumn get createdAt =>
+      customType(PgTypes.timestampWithTimezone).withDefault(now())();
 }
 ```
 
-### JSON Column
+Common types:
 
-```dart
-class Settings extends Table {
-  late final id = integer().autoIncrement()();
-  late final config = postgresJson()();
-}
-```
-
-### Array Column
-
-```dart
-class Posts extends Table {
-  late final id = integer().autoIncrement()();
-  late final tags = postgresArray(PostgresTypes.text)();
-}
-```
-
-### Custom Types
-
-Use PostgreSQL-specific types:
-
-```dart
-class Data extends Table {
-  late final id = integer().autoIncrement()();
-  late final metadata = postgresJsonb()();
-  late final createdAt = dateTime().withDefault(
-    FunctionCallExpression.currentTimestamp(),
-  );
-}
-```
+- `PgTypes.uuid` maps to `UuidValue`
+- `PgTypes.json` and `PgTypes.jsonb` map to JSON-like Dart objects
+- `PgTypes.textArray` maps to `List<String>`
+- `PgTypes.date` maps to `PgDate`
+- `PgTypes.timestampWithTimezone` and `PgTypes.timestampNoTimezone` map to
+  `PgDateTime`
 
 ## PostgreSQL Functions
 
-### Generate UUID
+Use exported helpers when available:
 
 ```dart
-final id = await into(users).insert(
-  UsersCompanion.insert(
-    name: 'John',
-    id: const Value(gen_random_uuid()),
-  ),
-);
+UuidColumn get id => customType(PgTypes.uuid).withDefault(genRandomUuid())();
+TimestampColumn get createdAt =>
+    customType(PgTypes.timestampWithTimezone).withDefault(now())();
 ```
 
-### Current Timestamp
+For PostgreSQL functions that `drift_postgres` does not wrap, use
+`FunctionCallExpression` or `customSelect`.
+
+## Queries
+
+Array contains:
 
 ```dart
-final now = FunctionCallExpression.currentTimestamp();
+final tagged = await (db.select(db.events)
+      ..where((event) => event.tags.contains('dart')))
+    .get();
 ```
 
-## Queries with PostgreSQL
-
-### JSON Query
+JSON operators are often clearest as custom SQL:
 
 ```dart
-final users = await (select(users)
-  ..where((u) =>
-      u.jsonData.containsString('key', 'value'))
-  ).get();
+final rows = await db.customSelect(
+  "SELECT * FROM events WHERE payload ->> 'kind' = ?",
+  variables: [Variable.withString('created')],
+  readsFrom: {db.events},
+).get();
 ```
 
-### Array Contains
+Full text search is also a custom SQL use case:
 
 ```dart
-final posts = await (select(posts)
-  ..where((p) =>
-      p.tags.contains('tag1'))
-  ).get();
-```
-
-### Full Text Search
-
-```dart
-final posts = await customSelect('''
-    SELECT * FROM posts
-    WHERE to_tsvector(content) @@ plainto_tsquery(?)
-  ''', ['search term']).get();
+final rows = await db.customSelect(
+  '''
+  SELECT * FROM posts
+  WHERE to_tsvector('english', content) @@ plainto_tsquery('english', ?)
+  ''',
+  variables: [Variable.withString(searchTerm)],
+  readsFrom: {db.posts},
+).get();
 ```
 
 ## Indexes
 
-### JSON Index
+Use raw SQL indexes for PostgreSQL-specific index types:
 
 ```dart
 @TableIndex.sql('''
-  CREATE INDEX data_key_idx ON data ((config->>'key'))
+  CREATE INDEX events_payload_kind_idx ON events ((payload ->> 'kind'));
 ''')
-class Data extends Table {
-  late final id = integer().autoIncrement()();
-  late final config = postgresJson()();
+class Events extends Table {
+  UuidColumn get id => customType(PgTypes.uuid).withDefault(genRandomUuid())();
+  JsonColumn get payload => customType(PgTypes.jsonb)();
 }
 ```
-
-### GIN Index for Arrays
 
 ```dart
 @TableIndex.sql('''
-  CREATE INDEX posts_tags_gin ON posts USING GIN (tags)
+  CREATE INDEX events_tags_gin_idx ON events USING GIN (tags);
 ''')
-class Posts extends Table {
-  late final id = integer().autoIncrement()();
-  late final tags = postgresArray(PostgresTypes.text)();
+class Events extends Table {
+  UuidColumn get id => customType(PgTypes.uuid).withDefault(genRandomUuid())();
+  Column<List<String>> get tags => customType(PgTypes.textArray)();
 }
 ```
 
-## Migrations with PostgreSQL
+## Caveats
 
-### Export Schema
-
-Export drift schema for PostgreSQL:
-
-```bash
-dart run drift_dev schema dump lib/database.dart > schema.sql
-```
-
-### Manual Migrations
-
-Use raw SQL for PostgreSQL migrations:
-
-```dart
-from1To2: (m, schema) async {
-  await m.customStatement('''
-    ALTER TABLE users
-    ADD COLUMN created_at TIMESTAMP DEFAULT NOW()
-  ''');
-}
-```
-
-### Migration Tools
-
-Consider PostgreSQL-native tools:
-- pgmigrate
-- sqitch
-- Flyway
-
-## Performance Tips
-
-### Connection Pooling
-
-Always use pools in production:
-
-```dart
-final pool = PgPool(endpoint, settings: PoolSettings(maxSize: 20));
-final database = AppDatabase(PgDatabase.opened(pool));
-```
-
-### Prepared Statements
-
-Drift automatically prepares statements.
-
-### Indexes
-
-Create indexes on frequently queried columns:
-
-```dart
-@TableIndex(name: 'users_email_idx', columns: {#email})
-class Users extends Table {
-  late final email = text()();
-}
-```
-
-## Testing with PostgreSQL
-
-### Test Database
-
-```dart
-import 'package:drift/drift.dart';
-
-AppDatabase createTestDatabase() {
-  return AppDatabase(NativeDatabase.memory());
-}
-```
-
-For PostgreSQL integration tests, use test database:
-
-```dart
-AppDatabase createPostgresTestDatabase() {
-  final endpoint = HostEndpoint(
-      host: 'localhost',
-      port: 5432,
-      database: 'test_db',
-      username: 'test_user',
-      password: 'test_pass',
-    );
-
-  return AppDatabase(
-    PgDatabase(endpoint: endpoint),
-  );
-}
-```
-
-## Common Patterns
-
-### Soft Deletes
-
-```dart
-class Todos extends Table {
-  late final id = integer().autoIncrement()();
-  late final title = text()();
-  late final deletedAt = dateTime().nullable()();
-}
-
-Future<List<Todo>> getActiveTodos() {
-  return (select(todos)
-    ..where((t) => t.deletedAt.isNull())
-  ).get();
-}
-```
-
-### Updated At
-
-```dart
-class Users extends Table {
-  late final id = postgresUuid().autoGenerate()();
-  late final name = text()();
-  late final updatedAt = dateTime().withDefault(
-    FunctionCallExpression.currentTimestamp(),
-  );
-}
-```
-
-## Best Practices
-
-1. **Connection pooling**: Always use pools in production
-2. **Indexes**: Index frequently queried columns
-3. **Migration tools**: Use PostgreSQL-native tools for complex migrations
-4. **Type safety**: Use drift's type generation for PostgreSQL types
-5. **Testing**: Use in-memory SQLite for unit tests, real Postgres for integration tests
-6. **Timeouts**: Set appropriate connection and query timeouts
-7. **SSL**: Enable SSL in production
+- PostgreSQL support is stable, but Drift has more SQLite-first helper APIs than
+  PostgreSQL-specific wrappers.
+- Avoid SQLite-oriented `currentDateAndTime` and most `dateTime()` helper APIs
+  in PostgreSQL schemas.
+- Use real PostgreSQL integration tests for Postgres behavior. SQLite in-memory
+  tests only validate shared query-builder behavior.
+- For complex production migrations, consider PostgreSQL-native migration tools
+  and keep Drift focused on typed access after the migration.

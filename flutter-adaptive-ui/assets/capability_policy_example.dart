@@ -1,23 +1,31 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
 
 /// Example of Capability and Policy classes
-/// for handling platform-specific behavior
+/// for handling platform-specific behavior.
 class CapabilityPolicyExample extends StatelessWidget {
-  const CapabilityPolicyExample({super.key});
+  const CapabilityPolicyExample({
+    super.key,
+    this.capability = const Capability(),
+    this.policy = const Policy(),
+  });
+
+  final Capability capability;
+  final Policy policy;
 
   @override
   Widget build(BuildContext context) {
+    final canOpenExternalPurchase = capability.canOpenExternalPurchase();
+    final shouldShowExternalPurchase = policy.shouldShowExternalPurchase();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Capability & Policy Example')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Using Policy class for business logic
-            if (Policy().shouldShowPurchaseButton())
+            if (canOpenExternalPurchase && shouldShowExternalPurchase)
               ElevatedButton(
-                onPressed: () => Capability().openBrowser(),
+                onPressed: capability.openExternalPurchase,
                 child: const Text('Buy in Browser'),
               )
             else
@@ -31,35 +39,27 @@ class CapabilityPolicyExample extends StatelessWidget {
 
 /// Capability class - defines what the code CAN do
 class Capability {
-  /// Check if browser is available
-  bool hasBrowserCapability() {
-    return Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+  const Capability();
+
+  /// Check whether the app has an implementation for opening purchases.
+  bool canOpenExternalPurchase() {
+    return true;
   }
 
-  /// Open browser (implementation depends on platform)
-  void openBrowser() {
-    if (hasBrowserCapability()) {
-      // Launch browser implementation would go here
-      print('Opening browser...');
-    }
+  /// Open purchase flow using the target app's URL launcher or service.
+  void openExternalPurchase() {
+    debugPrint('Opening purchase flow');
   }
 }
 
 /// Policy class - defines what the code SHOULD do
 class Policy {
-  /// Policy: don't show purchase button on iOS
-  bool shouldShowPurchaseButton() {
-    return !Platform.isIOS;
-  }
+  const Policy({this.externalPurchaseAllowed = true});
 
-  /// Policy: use specific payment provider based on platform
-  String getPaymentProvider() {
-    if (Platform.isAndroid) {
-      return 'Google Play';
-    } else if (Platform.isIOS) {
-      return 'Apple App Store';
-    } else {
-      return 'Web Payment';
-    }
+  final bool externalPurchaseAllowed;
+
+  /// Policy: decide whether the external purchase entry point is allowed.
+  bool shouldShowExternalPurchase() {
+    return externalPurchaseAllowed;
   }
 }

@@ -1,50 +1,87 @@
 ---
 title: Setup
-description: Setup drift for Dart applications
+description: Set up Drift for non-Flutter Dart applications
 ---
 
-## SQLite Setup
+# Setup
 
-Add drift to your `pubspec.yaml`:
+Use this reference when adding Drift to Dart CLI tools, server processes, or
+native desktop apps. For Flutter apps, use the `flutter-drift` skill.
 
-```yaml
-dependencies:
-  drift: ^2.14.0
-  sqlite3: ^2.4.0
+## Dependencies
 
-dev_dependencies:
-  drift_dev: ^2.14.0
-  build_runner: ^2.4.0
-```
-
-Or run:
+Prefer commands so the project receives current compatible versions:
 
 ```bash
-dart pub add drift sqlite3 dev:drift_dev dev:build_runner
+dart pub add drift sqlite3
+dart pub add dev:drift_dev dev:build_runner
 ```
 
-## PostgreSQL Setup
-
-For PostgreSQL databases, add these dependencies:
-
-```yaml
-dependencies:
-  drift: ^2.14.0
-  postgres: ^2.6.0
-  drift_postgres: ^1.2.0
-
-dev_dependencies:
-  drift_dev: ^2.14.0
-  build_runner: ^2.4.0
-```
-
-Or run:
+For PostgreSQL support, also add:
 
 ```bash
-dart pub add drift postgres drift_postgres dev:drift_dev dev:build_runner
+dart pub add drift_postgres postgres
 ```
 
-Configure for PostgreSQL in `build.yaml`:
+If a project requires manual `pubspec.yaml` edits, keep `drift` and
+`drift_dev` on the same minor release when possible and follow the existing
+repository version policy.
+
+## Code Generation
+
+Every generated database file needs a `part` directive and a build step:
+
+```dart
+import 'package:drift/drift.dart';
+
+part 'database.g.dart';
+```
+
+```bash
+dart run build_runner build
+```
+
+Use `dart run build_runner watch` only during interactive development.
+
+## SQLite Database
+
+Use `package:drift/native.dart` for non-Flutter native Dart apps:
+
+```dart
+import 'dart:io';
+
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+
+part 'database.g.dart';
+
+class TodoItems extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text().withLength(min: 1, max: 200)();
+  TextColumn get content => text().nullable()();
+  BoolColumn get isCompleted => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+@DriftDatabase(tables: [TodoItems])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
+
+  @override
+  int get schemaVersion => 1;
+}
+
+QueryExecutor _openConnection() {
+  return NativeDatabase.createInBackground(File('db.sqlite'));
+}
+```
+
+Do not open SQLite manually with `sqlite3.open()` before passing it to Drift
+unless the project has a specific reason to manage the low-level connection.
+
+## PostgreSQL Database
+
+Configure the SQL dialect before generating code:
 
 ```yaml
 targets:
@@ -54,102 +91,71 @@ targets:
         options:
           sql:
             dialects:
+              - sqlite
               - postgres
 ```
 
-## Database Class (SQLite)
-
-Every Dart app using drift needs a database class. Create a `database.dart` file:
-
-```dart
-import 'package:drift/drift.dart';
-
-part 'database.g.dart';
-
-class TodoItems extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  TextColumn get title => text()();
-  DateTimeColumn get createdAt => dateTime().nullable()();
-}
-
-@DriftDatabase(tables: [TodoItems])
-class AppDatabase extends _$AppDatabase {
-  AppDatabase(QueryExecutor e) : super(e);
-
-  @override
-  int get schemaVersion => 1;
-}
-```
-
-## Opening Database (SQLite)
-
-```dart
-import 'package:drift/drift.dart';
-import 'package:sqlite3/sqlite3.dart';
-import 'package:path/path.dart';
-
-AppDatabase openConnection() {
-  final file = File('db.sqlite');
-  return AppDatabase(LazyDatabase(() async {
-    final db = sqlite3.open(file.path);
-    return NativeDatabase.createInBackground(db);
-  });
-}
-```
-
-## Opening Database (PostgreSQL)
+Use `pg.Endpoint` from `package:postgres`:
 
 ```dart
 import 'package:drift/drift.dart';
 import 'package:drift_postgres/drift_postgres.dart';
-import 'package:postgres/postgres.dart';
+import 'package:postgres/postgres.dart' as pg;
 
-AppDatabase openPostgresConnection() {
-  final endpoint = HostEndpoint(
-    host: 'localhost',
-    port: 5432,
-    database: 'mydb',
-    username: 'user',
-    password: 'password',
-  );
+part 'database.g.dart';
 
-  return AppDatabase(
-    PgDatabase(
-      endpoint: endpoint,
-    ),
-  );
+@DriftDatabase(tables: [Users])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase(super.executor);
+
+  @override
+  int get schemaVersion => 1;
 }
-```
 
-## Connection Pooling (PostgreSQL)
-
-For better performance with PostgreSQL:
-
-```dart
-AppDatabase openPooledPostgresConnection() {
-  final endpoint = HostEndpoint(
-    host: 'localhost',
-    port: 5432,
-    database: 'mydb',
-    username: 'user',
-    password: 'password',
-  );
-
+AppDatabase openPostgresDatabase() {
   return AppDatabase(
     PgDatabase(
-      endpoint: endpoint,
-      settings: ConnectionSettings(
-        connectTimeout: Duration(seconds: 10),
-        queryTimeout: Duration(seconds: 30),
+      endpoint: pg.Endpoint(
+        host: 'localhost',
+        database: 'mydb',
+        username: 'user',
+        password: 'password',
+      ),
+      settings: pg.ConnectionSettings(
+        sslMode: pg.SslMode.disable,
       ),
     ),
   );
 }
 ```
 
-## In-Memory Database (Testing)
+For production services, prefer a pool. Close both the Drift database and the
+pool during shutdown:
 
-For unit tests, use an in-memory database:
+```dart
+final pool = pg.Pool.withEndpoints(
+  [
+    pg.Endpoint(
+      host: 'localhost',
+      database: 'mydb',
+      username: 'user',
+      password: 'password',
+    ),
+  ],
+  settings: pg.PoolSettings(maxConnectionCount: 10),
+);
+
+final db = AppDatabase(PgDatabase.opened(pool));
+
+Future<void> shutdown() async {
+  await db.close();
+  await pool.close();
+}
+```
+
+## Tests
+
+Use an in-memory SQLite database for fast unit tests:
 
 ```dart
 AppDatabase createTestDatabase() {
@@ -157,16 +163,5 @@ AppDatabase createTestDatabase() {
 }
 ```
 
-## Running Code Generator
-
-Generate code with build_runner:
-
-```bash
-dart run build_runner build
-```
-
-Or watch for changes during development:
-
-```bash
-dart run build_runner watch
-```
+PostgreSQL behavior needs integration tests against a real PostgreSQL database.
+Do not claim PostgreSQL behavior is verified from an in-memory SQLite test.

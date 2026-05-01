@@ -458,7 +458,7 @@ If you want the `Scaffold`'s child to be exactly the same size as the `Scaffold`
 [Center]: https://api.flutter.dev/flutter/widgets/Center-class.html
 [Container]: https://api.flutter.dev/flutter/widgets/Container-class.html
 [FittedBox]: https://api.flutter.dev/flutter/widgets/FittedBox-class.html
-[Image]: https://api.flutter.dev/flutter/dart-ui/Image-class.html
+[Image]: https://api.flutter.dev/flutter/widgets/Image-class.html
 [ListTile]: https://api.flutter.dev/flutter/material/ListTile-class.html
 [ListView]: https://api.flutter.dev/flutter/widgets/ListView-class.html
 [Opacity]: https://api.flutter.dev/flutter/widgets/Opacity-class.html

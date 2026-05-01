@@ -1,11 +1,17 @@
 ---
 title: Migrations
-description: Database migrations in drift
+description: Manage Drift schema migrations safely in Flutter apps
 ---
 
-## Configure for Migrations
+## Default Rule
 
-Add database to `build.yaml`:
+Use Drift's guided `make-migrations` workflow for existing apps. Manual migrations are error-prone and should be a fallback only when generated migration tooling cannot be adopted.
+
+Do not bump `schemaVersion` unless the migration path for existing user databases is known.
+
+## Configure Guided Migrations
+
+Add every database entry point to `build.yaml`:
 
 ```yaml
 targets:
@@ -14,83 +20,89 @@ targets:
       drift_dev:
         options:
           databases:
-            my_database: lib/database.dart
-            another_db: lib/database2.dart
-
+            app_database: lib/database.dart
           schema_dir: drift_schemas/
           test_dir: test/drift/
 ```
 
-## Run Migration Generator
+`databases` is required for `make-migrations`. `schema_dir` and `test_dir` may use the defaults, but declaring them makes the workflow explicit.
+
+## Initial Schema
+
+Before changing a database schema, generate the initial schema snapshot:
 
 ```bash
 dart run drift_dev make-migrations
 ```
 
-This generates:
-- `database.steps.dart` - step-by-step migration helper
-- Test files for migration verification
-- Schema files for each version
+Commit the generated schema files and migration test scaffolding. They are part of the migration contract.
 
-## Step-by-Step Migrations
+## Schema Change Workflow
 
-Use generated `stepByStep` function:
+1. Modify table declarations.
+2. Bump `schemaVersion`.
+3. Run:
+
+```bash
+dart run drift_dev make-migrations
+```
+
+4. Implement the generated step-by-step migration file.
+5. Run generated migration tests.
+6. Run `dart run build_runner build`.
+7. Run `flutter analyze` and app tests.
+
+## Step-By-Step Migration
+
+After `make-migrations`, import the generated steps file and wire `onUpgrade` to the generated `stepByStep` helper.
 
 ```dart
 import 'database.steps.dart';
 
-@DriftDatabase(...)
+@DriftDatabase(tables: [Categories, TodoItems])
 class AppDatabase extends _$AppDatabase {
+  AppDatabase(QueryExecutor executor) : super(executor);
+
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
-        onUpgrade: stepByStep(
-          from1To2: (m, schema) async {
-            // Version 1 to 2: Add column
-            await m.addColumn(schema.todoItems, schema.todoItems.dueDate);
-          },
-          from2To3: (m, schema) async {
-            // Version 2 to 3: Add indexes and alter table
-            await m.create(schema.todosDelete);
-            await m.create(schema.todosUpdate);
-            await m.alterTable(TableMigration(schema.todoItems));
-          },
-        ),
-      );
+      onCreate: (m) async => m.createAll(),
+      onUpgrade: _schemaUpgrade,
+      beforeOpen: (details) async {
+        await customStatement('PRAGMA foreign_keys = ON');
+      },
+    );
   }
 }
+
+extension Migrations on GeneratedDatabase {
+  OnUpgrade get _schemaUpgrade => stepByStep(
+        from1To2: (m, schema) async {
+          await m.addColumn(
+            schema.todoItems,
+            schema.todoItems.priority,
+          );
+        },
+      );
+}
 ```
 
-## Common Migration Operations
+Keep the `stepByStep` call outside the database class body when possible so migration code does not accidentally reference the current schema instead of generated schema snapshots.
 
-### Add Column
+## Common Operations
+
+Add a nullable column or a column with a SQL default:
 
 ```dart
 from1To2: (m, schema) async {
-  await m.addColumn(schema.users, schema.users.birthDate);
+  await m.addColumn(schema.todoItems, schema.todoItems.priority);
 }
 ```
 
-### Drop Column
-
-```dart
-from2To3: (m, schema) async {
-  await m.dropColumn(schema.users, schema.users.oldField);
-}
-```
-
-### Rename Column
-
-```dart
-from1To2: (m, schema) async {
-  await m.renameColumn(schema.users, schema.users.name, schema.users.fullName);
-}
-```
-
-### Add Table
+Create a new table:
 
 ```dart
 from1To2: (m, schema) async {
@@ -98,17 +110,7 @@ from1To2: (m, schema) async {
 }
 ```
 
-### Drop Table
-
-```dart
-from2To3: (m, schema) async {
-  await m.deleteTable('users');
-}
-```
-
-### Alter Table
-
-Rebuild table with new constraints:
+Alter a table when constraints or generated columns require a rebuild:
 
 ```dart
 from2To3: (m, schema) async {
@@ -116,229 +118,107 @@ from2To3: (m, schema) async {
 }
 ```
 
-### Create Index
-
-```dart
-from1To2: (m, schema) async {
-  await m.create(schema.usersByNameIndex);
-}
-```
-
-### Drop Index
+Create an index generated from a `@TableIndex` annotation:
 
 ```dart
 from2To3: (m, schema) async {
-  await m.dropIndex('users_name_idx');
+  await m.create(schema.todoItemsCompleted);
 }
 ```
 
-### Custom SQL
+Use custom SQL only when Drift's migrator API cannot express the operation:
 
-Execute custom SQL:
+```dart
+from2To3: (m, schema) async {
+  await m.customStatement('''
+    UPDATE todo_items
+    SET priority = 0
+    WHERE priority IS NULL
+  ''');
+}
+```
+
+## Data Migrations
+
+Prefer SQL statements over reading through current generated row classes during migration. Drift query builders expect the latest schema, which can be unsafe while upgrading older schemas.
 
 ```dart
 from1To2: (m, schema) async {
+  await m.addColumn(schema.todoItems, schema.todoItems.priority);
   await m.customStatement('''
-    UPDATE users
-    SET status = 'inactive'
-    WHERE last_login < ?
-  ''', [DateTime.now().subtract(Duration(days: 365)]);
+    UPDATE todo_items
+    SET priority = 0
+    WHERE priority IS NULL
+  ''');
 }
 ```
+
+If Dart transformation is unavoidable, run it only after the columns or tables it needs exist.
 
 ## Post-Migration Callbacks
 
-Run code after migrations:
+Use `beforeOpen` for pragmas and seed data. Guard seed data with `details.wasCreated` or `details.hadUpgrade`.
 
 ```dart
 @override
 MigrationStrategy get migration {
   return MigrationStrategy(
-      onUpgrade: stepByStep(...),
-      beforeOpen: (details) async {
-        // Enable foreign keys
-        await customStatement('PRAGMA foreign_keys = ON');
+    onCreate: (m) async => m.createAll(),
+    onUpgrade: _schemaUpgrade,
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
 
-        // Populate default data
-        if (details.wasCreated) {
-          final workId = await into(categories).insert(
-            CategoriesCompanion.insert(
-              name: 'Work',
-            ),
-          );
+      if (details.wasCreated) {
+        final inboxId = await into(categories).insert(
+          CategoriesCompanion.insert(name: 'Inbox'),
+        );
 
-          await into(todoItems).insert(
-            TodoItemsCompanion.insert(
-              title: 'First todo',
-              category: Value(workId),
-            ),
-          );
-        }
-      },
-    );
-}
-```
-
-## Manual Migrations
-
-Write migrations without `make-migrations`:
-
-```dart
-@override
-MigrationStrategy get migration {
-  return MigrationStrategy(
-      onCreate: (Migrator m) async {
-        await m.createAll();
-      },
-      onUpgrade: (Migrator m, int from, int to) async {
-        if (from == 1 && to == 2) {
-          await m.addColumn(todoItems, todoItems.dueDate);
-        }
-        if (from == 2 && to == 3) {
-          await m.create(todosDelete);
-        }
-      },
-    );
+        await into(todoItems).insert(
+          TodoItemsCompanion.insert(
+            title: 'First todo',
+            category: Value(inboxId),
+          ),
+        );
+      }
+    },
+  );
 }
 ```
 
 ## Testing Migrations
 
-Generated test files verify migrations:
+`make-migrations` generates migration tests. Run them after every schema change:
 
 ```bash
-dart test test/drift/schema_test.dart
+dart test test/drift/
 ```
 
-Test validates:
-- Data integrity across migrations
-- Schema consistency
-- Migration correctness
+Migration tests should verify:
 
-## Data Migration Strategies
+- a new database can be created at the latest schema;
+- every old schema can migrate to the latest schema;
+- important user data survives migration;
+- indexes, constraints, and foreign keys match the expected schema.
 
-### Copy and Transform
+## Manual Fallback
 
-Migrate data with transformation:
-
-```dart
-from1To2: (m, schema) async {
-  // Add new column
-  await m.addColumn(schema.users, schema.users.fullName);
-
-  // Transform data
-  final users = await (select(users)).get();
-  await batch((batch) {
-    for (final user in users) {
-      batch.update(
-        users,
-        UsersCompanion(
-          id: Value(user.id),
-          fullName: Value('${user.firstName} ${user.lastName}'),
-        ),
-      );
-    }
-  });
-}
-```
-
-### Rename with Data Migration
-
-```dart
-from1To2: (m, schema) async {
-  // Rename column
-  await m.renameColumn(schema.users, schema.users.name, schema.users.username);
-
-  // Migrate data if needed
-  await customStatement('''
-    UPDATE users
-    SET username = LOWER(name)
-    WHERE username IS NULL
-  ''');
-}
-```
-
-## Debugging Migrations
-
-### Enable Logging
+Use manual migrations only when generated migration files cannot be used. Keep conditions incremental with `from < version`, not only exact equality, so users can migrate across multiple versions.
 
 ```dart
 @override
 MigrationStrategy get migration {
   return MigrationStrategy(
-      onUpgrade: stepByStep(...),
-      beforeOpen: (details) async {
-        print('Opening database, version: ${details.to}');
-        print('Was created: ${details.wasCreated}');
-      },
-    );
+    onCreate: (m) async => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(todoItems, todoItems.priority);
+      }
+      if (from < 3) {
+        await m.createTable(categories);
+      }
+    },
+  );
 }
 ```
 
-### Check Current Schema
-
-```dart
-Future<void> debugSchema() async {
-  final executor = database.executor;
-  final schema = await database.schema;
-  print('Current schema: $schema');
-}
-```
-
-## Common Patterns
-
-### Add Foreign Key
-
-```dart
-from1To2: (m, schema) async {
-  await m.addColumn(schema.todoItems, schema.todoItems.category);
-}
-
-// Re-enable after migration
-@override
-MigrationStrategy get migration {
-  return MigrationStrategy(
-      onUpgrade: stepByStep(...),
-      beforeOpen: (details) async {
-        if (details.hadUpgrade) {
-          await customStatement('PRAGMA foreign_keys = ON');
-        }
-      },
-    );
-}
-```
-
-### Rename Table
-
-```dart
-from1To2: (m, schema) async {
-  await m.createTable(schema.newUsers);
-  await m.customStatement('''
-    INSERT INTO new_users
-    SELECT * FROM old_users
-  ''');
-  await m.deleteTable('old_users');
-}
-```
-
-### Add Unique Constraint
-
-```dart
-from1To2: (m, schema) async {
-  await m.alterTable(
-        TableMigration(
-          schema.users,
-          newColumns: {schema.users.email.unique()},
-        ),
-      );
-}
-```
-
-## Best Practices
-
-1. **Incremental migrations**: Use `stepByStep` for maintainable code
-2. **Test thoroughly**: Run generated tests for each migration
-3. **Backup data**: Ensure migrations don't lose user data
-4. **Use transactions**: Wrap data migrations in transactions
-5. **Document changes**: Comment complex transformations
-6. **Version carefully**: Only bump `schemaVersion` when schema changes
+Report manual migration fallback as a residual risk unless it has equivalent tests.

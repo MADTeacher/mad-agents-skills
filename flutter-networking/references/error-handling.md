@@ -17,8 +17,10 @@ Future<Album> fetchAlbum(int id) async {
   switch (response.statusCode) {
     case 200:
     case 201:
-    case 204:
       return Album.fromJson(jsonDecode(response.body));
+
+    case 204:
+      throw JsonParseException('Expected album body, got empty response');
 
     case 400:
       throw BadRequestException('Invalid request');
@@ -91,8 +93,8 @@ class NetworkException extends ApiException {
   NetworkException(String message) : super(message);
 }
 
-class TimeoutException extends ApiException {
-  TimeoutException(String message) : super(message);
+class ApiTimeoutException extends ApiException {
+  ApiTimeoutException(String message) : super(message);
 }
 ```
 
@@ -179,11 +181,13 @@ Future<T> withTimeout<T>(Future<T> future, Duration duration) async {
     return await future.timeout(
       duration,
       onTimeout: () {
-        throw TimeoutException('Request timed out after ${duration.inSeconds}s');
+        throw ApiTimeoutException(
+          'Request timed out after ${duration.inSeconds}s',
+        );
       },
     );
   } on TimeoutException catch (e) {
-    throw TimeoutException(e.message ?? 'Request timed out');
+    throw ApiTimeoutException(e.message ?? 'Request timed out');
   }
 }
 
@@ -236,7 +240,7 @@ class ErrorDisplay extends StatelessWidget {
       return 'The requested resource was not found.';
     } else if (error is ServerException) {
       return 'Server error. Please try again later.';
-    } else if (error is TimeoutException) {
+    } else if (error is ApiTimeoutException) {
       return 'Request timed out. Please try again.';
     } else {
       return 'An error occurred: $error';
@@ -332,7 +336,7 @@ Future<T> fetchWithRetry<T>(
 
 bool _isRetryableError(Object error) {
   return error is NetworkException ||
-      error is TimeoutException ||
+      error is ApiTimeoutException ||
       error is ServerException ||
       error is TooManyRequestsException;
 }

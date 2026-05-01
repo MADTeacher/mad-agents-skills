@@ -731,5 +731,5 @@ Contributions are welcome! Please:
 
 ---
 
-**Version:** 1.0  
-**Last updated:** January 2026
+**Version:** 2.0  
+**Last updated:** May 2026

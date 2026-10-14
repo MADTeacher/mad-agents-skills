@@ -87,8 +87,9 @@ does not already have an equivalent typed error/result abstraction.
 ```dart
 Future<Result<User>> fetchUser(String id) async {
   try {
-    final response = await http.get('/users/$id');
-    final user = User.fromJson(response.body);
+    // http.get takes a Uri, not a String
+    final response = await http.get(Uri.parse('$baseUrl/users/$id'));
+    final user = User.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
     return Result.ok(user);
   } catch (e) {
     return Result.error(Exception('Failed to fetch user: $e'));
@@ -274,15 +275,15 @@ class TodoRepository {
     // Save locally first (offline support)
     await _local.saveTodo(todo);
 
-    // Sync when online
+    // Sync when online. The API service returns Future<Todo> and throws on
+    // failure; the repository wraps the outcome in a Result.
     if (await _hasConnection()) {
-      final result = await _api.createTodo(todo);
-      switch (result) {
-        case Ok<Todo>():
-          await _local.saveTodo(result.value);
-          return result;
-        case Error<Todo>():
-          return result;
+      try {
+        final savedTodo = await _api.createTodo(todo);
+        await _local.saveTodo(savedTodo);
+        return Result.ok(savedTodo);
+      } catch (e) {
+        return Result.error(e is Exception ? e : Exception(e.toString()));
       }
     }
 
@@ -414,7 +415,7 @@ class TodoDatabase {
 
   Future<void> init() async {
     await _database.execute('''
-      CREATE TABLE $_tableName (
+      CREATE TABLE IF NOT EXISTS $_tableName (
         $_id TEXT PRIMARY KEY,
         $_title TEXT NOT NULL,
         $_isComplete INTEGER NOT NULL

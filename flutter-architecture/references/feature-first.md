@@ -147,7 +147,7 @@ features/
 - `repositories/`, `services/`, `models/`
 - `views/`, `viewmodels/`
 
-**Files:** snake_case for regular files, camelCase for classes
+**Files:** snake_case for file names, UpperCamelCase for classes
 - `todo_repository.dart` → `class TodoRepository`
 - `todo_list_view.dart` → `class TodoListView`
 - `fetch_todos.dart` → `class FetchTodos`
@@ -296,14 +296,23 @@ import 'package:my_app/features/todos/todos.dart';
 
 ### 2. Lazy Loading
 
-For large apps, use lazy loading:
+For large apps, load a feature lazily with a Dart deferred import. Neither Flutter
+nor go_router has a `LazyLoad` widget. Code is actually split on web, and on Android
+with deferred components; elsewhere `loadLibrary()` completes immediately.
 
 ```dart
+// At the top of the router file
+import 'package:my_app/features/todos/todos.dart' deferred as todos;
+
 // In router
 GoRoute(
   path: '/todos',
-  builder: (context, state) => const LazyLoad(
-    builder: () => const TodosView(),
+  builder: (context, state) => FutureBuilder<void>(
+    future: todos.loadLibrary(),
+    builder: (context, snapshot) =>
+        snapshot.connectionState == ConnectionState.done
+            ? todos.TodosView() // deferred classes cannot be used in const expressions
+            : const Center(child: CircularProgressIndicator()),
   ),
 );
 ```
@@ -317,20 +326,23 @@ Keep feature dependencies minimal:
 
 ### 4. Testing
 
-Each feature is testable independently:
+Each feature is testable independently. Put tests under `test/`, mirroring the
+`lib/features/` tree: `flutter test` with no arguments only runs files in `test/`,
+and test files under `lib/` would import the `flutter_test` dev dependency from app code.
 
 ```
-features/
-└── todos/
-    ├── data/
-    │   └── repositories/
-    │       └── todo_repository_test.dart
-    ├── domain/
-    │   └── use-cases/
-    │       └── fetch_todos_test.dart
-    └── presentation/
-        └── viewmodels/
-            └── todo_list_viewmodel_test.dart
+test/
+└── features/
+    └── todos/
+        ├── data/
+        │   └── repositories/
+        │       └── todo_repository_test.dart
+        ├── domain/
+        │   └── use-cases/
+        │       └── fetch_todos_test.dart
+        └── presentation/
+            └── viewmodels/
+                └── todo_list_viewmodel_test.dart
 ```
 
 ## Migration from Layer-First

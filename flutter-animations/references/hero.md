@@ -200,7 +200,8 @@ Hero(
           child: child,
         );
       },
-      child: child,
+      // The builder has no `child` parameter: take it from the destination Hero.
+      child: (toContext.widget as Hero).child,
     );
   },
   createRectTween: (begin, end) {
@@ -231,12 +232,13 @@ Hero(
 For complete control:
 
 ```dart
-class LinearRectTween extends Tween<Rect> {
-  LinearRectTween({required Rect begin, required Rect end})
-    : super(begin: begin, end: end);
+// createRectTween must return a Tween<Rect?> (CreateRectTween receives
+// nullable rects), so extend RectTween rather than Tween<Rect>.
+class LinearRectTween extends RectTween {
+  LinearRectTween({super.begin, super.end});
 
   @override
-  Rect lerp(double t) => Rect.lerp(begin!, end!, t);
+  Rect? lerp(double t) => Rect.lerp(begin, end, t);
 }
 
 Hero(
@@ -335,7 +337,7 @@ class RadialHeroAnimation extends StatelessWidget {
                     child: child,
                   );
                 },
-                child: child,
+                child: (toContext.widget as Hero).child,
               );
             },
             child: RadialExpansion(
@@ -413,7 +415,7 @@ Hero(
           child: child,
         );
       },
-      child: child,
+      child: (toContext.widget as Hero).child,
     );
   },
   child: Image.asset('image.png'),
@@ -441,9 +443,26 @@ Hero(
 
 ### Animation Duration
 
+The hero flight is driven by the route's animation, so it lasts as long as the
+route's `transitionDuration` (and `reverseTransitionDuration` on pop):
+
+```dart
+Navigator.of(context).push(
+  PageRouteBuilder<void>(
+    transitionDuration: const Duration(milliseconds: 600),
+    reverseTransitionDuration: const Duration(milliseconds: 600),
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        const DetailScreen(photo: 'images/photo_0.png'),
+  ),
+);
+```
+
+### Page Transition Builders
+
+`pageTransitionsTheme` changes how routes animate, not how long they take:
+
 ```dart
 MaterialApp(
-  // Set global hero animation duration
   theme: ThemeData(
     pageTransitionsTheme: PageTransitionsTheme(
       builders: {
@@ -459,15 +478,21 @@ MaterialApp(
 
 ```dart
 class CustomHeroTransitionBuilder extends PageTransitionsBuilder {
+  const CustomHeroTransitionBuilder();
+
   @override
   Widget buildTransitions<T>(
     PageRoute<T> route,
-    BuildContext? secondaryContext,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    return FadeUpwardsPageTransitionsBuilder().buildTransitions(
+    return const FadeUpwardsPageTransitionsBuilder().buildTransitions(
       route,
-      secondaryContext,
+      context,
+      animation,
+      secondaryAnimation,
       child,
     );
   }
@@ -673,24 +698,28 @@ class PhotoDetail extends StatelessWidget {
 }
 ```
 
-### Nested Heroes
+### Several Heroes in One Card
+
+A Hero cannot be a descendant of another Hero: `Hero.build` asserts
+"A Hero widget cannot be the descendant of another Hero widget." Give each
+element its own Hero, as siblings with distinct tags:
 
 ```dart
-Hero(
-  tag: 'parent',
-  child: Card(
-    child: Column(
-      children: [
-        Hero(
-          tag: 'child-image',
-          child: Image.asset('image.png'),
-        ),
-        Hero(
-          tag: 'child-title',
+Card(
+  child: Column(
+    children: [
+      Hero(
+        tag: 'card-image',
+        child: Image.asset('image.png'),
+      ),
+      Hero(
+        tag: 'card-title',
+        child: Material(
+          type: MaterialType.transparency,
           child: Text('Title'),
         ),
-      ],
-    ),
+      ),
+    ],
   ),
 )
 ```

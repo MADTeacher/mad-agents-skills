@@ -62,9 +62,8 @@ class DraggableFling extends StatefulWidget {
 
 class _DraggableFlingState extends State<DraggableFling>
     with SingleTickerProviderStateMixin {
+  // Unbounded controller: its value is the horizontal offset in pixels.
   late AnimationController _controller;
-  double _dragX = 0;
-  Offset? _startPosition;
 
   @override
   void initState() {
@@ -80,19 +79,23 @@ class _DraggableFlingState extends State<DraggableFling>
 
   void _handlePanStart(DragStartDetails details) {
     _controller.stop();
-    _startPosition = details.globalPosition;
   }
 
   void _handlePanUpdate(DragUpdateDetails details) {
-    if (_startPosition != null) {
-      setState(() {
-        _dragX += details.delta.dx;
-      });
-    }
+    _controller.value += details.delta.dx;
   }
 
   void _handlePanEnd(DragEndDetails details) {
-    _controller.fling(velocity: details.velocity.pixelsPerSecond.dx / 1000);
+    // Don't call fling() on an unbounded controller: fling() springs towards
+    // lowerBound/upperBound, which are -infinity/+infinity here.
+    // FrictionSimulation decelerates from the release velocity (px/s) to a stop.
+    _controller.animateWith(
+      FrictionSimulation(
+        0.135, // drag: fraction of velocity left after one second
+        _controller.value,
+        details.velocity.pixelsPerSecond.dx,
+      ),
+    );
   }
 
   @override
@@ -105,7 +108,7 @@ class _DraggableFlingState extends State<DraggableFling>
         animation: _controller,
         builder: (context, child) {
           return Transform.translate(
-            offset: Offset(_dragX + _controller.value, 0),
+            offset: Offset(_controller.value, 0),
             child: child,
           );
         },
@@ -135,16 +138,17 @@ class _SpringAnimationState extends State<SpringAnimation>
     super.initState();
     _controller = AnimationController.unbounded(vsync: this);
 
+    // SpringSimulation takes positional arguments: (spring, start, end, velocity).
     _controller.animateWith(
       SpringSimulation(
-        spring: const SpringDescription(
+        const SpringDescription(
           mass: 1.0,
           stiffness: 200.0,
           damping: 10.0,
         ),
-        start: 0.0,
-        end: 1.0,
-        velocity: 0.0,
+        0.0, // start
+        1.0, // end
+        0.0, // velocity
       ),
     );
   }
@@ -176,9 +180,15 @@ class _SpringAnimationState extends State<SpringAnimation>
 ```dart
 SpringDescription(
   mass: 1.0,        // Mass of the object (higher = more inertia)
-  stiffness: 200.0,   // Spring stiffness (higher = faster, stiffer)
-  damping: 10.0,      // Damping ratio (higher = less oscillation)
+  stiffness: 200.0, // Spring stiffness (higher = faster, stiffer)
+  damping: 10.0,    // Damping coefficient, not a ratio (higher = less oscillation)
 )
+
+// Or give the damping ratio directly (1.0 = critically damped, no overshoot):
+SpringDescription.withDampingRatio(
+  mass: 1.0,
+  stiffness: 200.0,
+  ratio: 1.0,
 )
 ```
 
@@ -191,41 +201,44 @@ SpringDescription(
 - How stiff the spring is
 - Typical values: 100 - 500
 - Higher stiffness = faster oscillation
-- Lower stiffness = slower, more "bouncy"
+- Lower stiffness = slower; with the same `damping` it also raises the damping ratio, so it bounces less
 
 **Damping:**
 - How quickly oscillation stops
-- Typical values: 5 - 20
-- Higher damping = less bounce
-- Lower damping = more bounce
-- Critical damping: ~15-18
+- `damping` is a coefficient, so its effect depends on mass and stiffness.
+  The damping ratio is `damping / (2 * sqrt(mass * stiffness))`:
+  - ratio < 1: underdamped, overshoots and oscillates
+  - ratio = 1: critically damped, settles fastest without overshoot
+  - ratio > 1: overdamped, settles slowly without overshoot
+- Critical damping is `2 * sqrt(mass * stiffness)`, about 28.3 for mass 1.0 and stiffness 200
+- Use `SpringDescription.withDampingRatio` to set the ratio directly
 
 ### Spring Presets
 
 **Bouncy:**
 ```dart
-SpringDescription(
+SpringDescription.withDampingRatio(
   mass: 0.5,
   stiffness: 300,
-  damping: 8,
+  ratio: 0.3, // visible overshoot and oscillation
 )
 ```
 
 **Snappy:**
 ```dart
-SpringDescription(
+SpringDescription.withDampingRatio(
   mass: 1.0,
   stiffness: 400,
-  damping: 18,
+  ratio: 0.9, // fast, almost no overshoot
 )
 ```
 
 **Gentle:**
 ```dart
-SpringDescription(
+SpringDescription.withDampingRatio(
   mass: 2.0,
   stiffness: 150,
-  damping: 20,
+  ratio: 1.0, // slow, no overshoot
 )
 ```
 
@@ -248,11 +261,15 @@ class _GravityAnimationState extends State<GravityAnimation>
     super.initState();
     _controller = AnimationController.unbounded(vsync: this);
 
+    // GravitySimulation takes positional arguments:
+    // (acceleration, start position, end position, initial velocity).
+    // The simulation is done once the position passes the end position.
     _controller.animateWith(
       GravitySimulation(
-        acceleration: 980,  // pixels/s²
-        distance: 500,  // pixels to fall
-        startDistance: 0,
+        980, // acceleration in pixels/s²
+        0, // start position
+        500, // end position: pixels to fall
+        0, // initial velocity
       ),
     );
   }
@@ -326,7 +343,11 @@ CustomScrollView(
 )
 ```
 
-### Platform-Adaptive Scroll
+### Always Scrollable
+
+Scrolls (and overscrolls) even when the content is shorter than the viewport.
+This is not platform-adaptive. For the platform default (bouncing on iOS and macOS,
+clamping elsewhere), omit `physics` and let `ScrollConfiguration` choose it.
 
 ```dart
 CustomScrollView(
@@ -415,14 +436,14 @@ void animateWithSpring({
   try {
     controller.animateWith(
       SpringSimulation(
-        spring: const SpringDescription(
+        const SpringDescription(
           mass: 1.0,
           stiffness: 200.0,
           damping: 15.0,
         ),
-        start: start,
-        end: end,
-        velocity: 0.0,
+        start,
+        end,
+        0.0, // velocity
       ),
     );
   } catch (e) {
@@ -437,14 +458,14 @@ void animateWithSpring({
 ```dart
 _controller.animateWith(
   SpringSimulation(
-    spring: const SpringDescription(
+    const SpringDescription(
       mass: 1.0,
       stiffness: 200.0,
       damping: 15.0,
     ),
-    start: 0.0,
-    end: 1.0,
-    velocity: 0.0,
+    0.0, // start
+    1.0, // end
+    0.0, // velocity
   ),
 );
 
@@ -476,9 +497,14 @@ class DismissibleWithPhysics extends StatefulWidget {
 
 class _DismissibleWithPhysicsState extends State<DismissibleWithPhysics>
     with SingleTickerProviderStateMixin {
+  static const _spring = SpringDescription(
+    mass: 1.0,
+    stiffness: 300.0,
+    damping: 15.0,
+  );
+
+  // Unbounded controller: its value is the horizontal offset in pixels.
   late AnimationController _controller;
-  double _dragX = 0;
-  bool _isDismissing = false;
 
   @override
   void initState() {
@@ -494,31 +520,21 @@ class _DismissibleWithPhysicsState extends State<DismissibleWithPhysics>
 
   void _handlePanEnd(DragEndDetails details) {
     final velocity = details.velocity.pixelsPerSecond.dx;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final offset = _controller.value;
 
-    if (velocity.abs() > 500 || _dragX.abs() > screenWidth / 3) {
-      // Dismiss
-      _controller.fling(velocity: velocity / screenWidth);
-      _isDismissing = true;
-      _controller.addStatusListener((status) {
-        if (status == AnimationStatus.completed && _isDismissing) {
-          widget.onDismiss();
-        }
-      });
+    if (velocity.abs() > 500 || offset.abs() > screenWidth / 3) {
+      // Dismiss: spring to a finite target off-screen. Don't use fling() on an
+      // unbounded controller: it would target -infinity/+infinity.
+      final direction = velocity.abs() > 500 ? velocity.sign : offset.sign;
+      _controller
+          .animateWith(
+            SpringSimulation(_spring, offset, direction * screenWidth, velocity),
+          )
+          .then((_) => widget.onDismiss());
     } else {
-      // Spring back
-      _controller.animateWith(
-        SpringSimulation(
-          spring: const SpringDescription(
-            mass: 1.0,
-            stiffness: 300.0,
-            damping: 15.0,
-          ),
-          start: _dragX,
-          end: 0,
-          velocity: velocity,
-        ),
-      );
+      // Spring back from the current offset.
+      _controller.animateWith(SpringSimulation(_spring, offset, 0, velocity));
     }
   }
 
@@ -527,9 +543,7 @@ class _DismissibleWithPhysicsState extends State<DismissibleWithPhysics>
     return GestureDetector(
       onPanUpdate: (details) {
         if (!_controller.isAnimating) {
-          setState(() {
-            _dragX += details.delta.dx;
-          });
+          _controller.value += details.delta.dx;
         }
       },
       onPanEnd: _handlePanEnd,
@@ -537,7 +551,7 @@ class _DismissibleWithPhysicsState extends State<DismissibleWithPhysics>
         animation: _controller,
         builder: (context, child) {
           return Transform.translate(
-            offset: Offset(_dragX + _controller.value, 0),
+            offset: Offset(_controller.value, 0),
             child: child,
           );
         },
@@ -563,11 +577,11 @@ Physics simulations can be computationally expensive. Optimize by:
 
 Finding the right spring parameters can be trial and error:
 
-1. Start with moderate values (mass: 1.0, stiffness: 200, damping: 15)
+1. Start with moderate values: `SpringDescription.withDampingRatio(mass: 1.0, stiffness: 200, ratio: 0.8)`
 2. Adjust for feel:
    - Too slow? Increase stiffness or decrease mass
-   - Too bouncy? Increase damping
-   - Not bouncy enough? Decrease damping or stiffness
+   - Too bouncy? Increase the damping ratio (1.0 removes overshoot)
+   - Not bouncy enough? Decrease the damping ratio
 3. Test on real devices
 
 ## Debugging
@@ -625,14 +639,14 @@ Use Flutter DevTools to profile physics animations:
 ```dart
 _controller.animateWith(
   SpringSimulation(
-    spring: const SpringDescription(
+    const SpringDescription(
       mass: 0.5,
       stiffness: 500,
       damping: 10,
     ),
-    start: 1.0,
-    end: 0.9,
-    velocity: 0,
+    1.0, // start
+    0.9, // end
+    0, // velocity
   ),
 );
 ```

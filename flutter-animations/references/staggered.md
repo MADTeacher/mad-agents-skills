@@ -12,7 +12,8 @@ All animations share one `AnimationController`. Each animation has an `Interval`
 
 ```dart
 class StaggeredFadeSlide extends StatelessWidget {
-  const StaggeredFadeSlide({super.key, required this.controller});
+  // Not const: a class with `late final` fields cannot have a const constructor.
+  StaggeredFadeSlide({super.key, required this.controller});
 
   final AnimationController controller;
 
@@ -58,7 +59,8 @@ class StaggeredFadeSlide extends StatelessWidget {
 
 ```dart
 class MultiPropertyStagger extends StatelessWidget {
-  const MultiPropertyStagger({super.key, required this.controller});
+  // Not const: a class with `late final` fields cannot have a const constructor.
+  MultiPropertyStagger({super.key, required this.controller});
 
   final AnimationController controller;
 
@@ -296,6 +298,7 @@ class _StaggeredMenuState extends State<StaggeredMenu>
 
   late AnimationController _controller;
   late List<Animation<double>> _itemAnimations;
+  late List<Animation<Offset>> _slideAnimations;
 
   @override
   void initState() {
@@ -306,19 +309,25 @@ class _StaggeredMenuState extends State<StaggeredMenu>
       vsync: this,
     );
 
-    _itemAnimations = StaggeredMenu._menuItems.map((item) {
-      final index = StaggeredMenu._menuItems.indexOf(item);
-      return Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(
-          parent: _controller,
-          curve: Interval(
-            index * 0.1,  // Start later for each item
-            (index * 0.1) + 0.4,  // Each takes 40% of controller
-            curve: Curves.easeOut,
-          ),
+    // Create every animation once, here, and never inside build(): each
+    // CurvedAnimation registers a listener on the controller.
+    final curves = List.generate(StaggeredMenu._menuItems.length, (index) {
+      return CurvedAnimation(
+        parent: _controller,
+        curve: Interval(
+          index * 0.1,  // Start later for each item
+          (index * 0.1) + 0.4,  // Each takes 40% of controller
+          curve: Curves.easeOut,
         ),
       );
-    }).toList();
+    });
+    _itemAnimations = [
+      for (final curve in curves) Tween<double>(begin: 0, end: 1).animate(curve),
+    ];
+    _slideAnimations = [
+      for (final curve in curves)
+        Tween<Offset>(begin: const Offset(1.0, 0), end: Offset.zero).animate(curve),
+    ];
 
     _controller.forward();
   }
@@ -334,29 +343,15 @@ class _StaggeredMenuState extends State<StaggeredMenu>
     return ListView.builder(
       itemCount: StaggeredMenu._menuItems.length,
       itemBuilder: (context, index) {
-        return AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: Offset(1.0, 0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: _controller,
-                curve: Interval(
-                  index * 0.1,
-                  (index * 0.1) + 0.4,
-                  curve: Curves.easeOut,
-                ),
-              )),
-              child: FadeTransition(
-                opacity: _itemAnimations[index],
-                child: child,
-              ),
-            );
-          },
-          child: ListTile(
-            title: Text(StaggeredMenu._menuItems[index]),
+        // SlideTransition and FadeTransition listen to their animations,
+        // so no AnimatedBuilder is needed.
+        return SlideTransition(
+          position: _slideAnimations[index],
+          child: FadeTransition(
+            opacity: _itemAnimations[index],
+            child: ListTile(
+              title: Text(StaggeredMenu._menuItems[index]),
+            ),
           ),
         );
       },
@@ -391,14 +386,13 @@ class _StaggeredGridState extends State<StaggeredGrid>
     );
 
     _animations = List.generate(widget.itemCount, (index) {
+      // Interval asserts end <= 1.0, so scale the start into [0.0, 0.7)
+      // and let each item take the remaining 30%.
+      final start = 0.7 * index / widget.itemCount;
       return Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(
           parent: _controller,
-          curve: Interval(
-            index / widget.itemCount,
-            (index / widget.itemCount) + 0.3,
-            curve: Curves.easeOut,
-          ),
+          curve: Interval(start, start + 0.3, curve: Curves.easeOut),
         ),
       );
     });
@@ -474,14 +468,12 @@ animation3 = Tween<double>(begin: 0, end: 1).animate(
 // Center expands first, then outward
 for (int i = 0; i < itemCount; i++) {
   final distance = (i - centerIndex).abs();
+  // distance <= itemCount - 1, so start <= 0.7 and end <= 1.0
+  final start = itemCount > 1 ? 0.7 * distance / (itemCount - 1) : 0.0;
   animations[i] = Tween<double>(begin: 0, end: 1).animate(
     CurvedAnimation(
       parent: controller,
-      curve: Interval(
-        distance * 0.1,
-        (distance * 0.1) + 0.3,
-        curve: Curves.easeOut,
-      ),
+      curve: Interval(start, start + 0.3, curve: Curves.easeOut),
     ),
   );
 }
@@ -492,13 +484,10 @@ for (int i = 0; i < itemCount; i++) {
 ```dart
 // Reveal items one by one from top
 for (int i = 0; i < itemCount; i++) {
+  final start = 0.85 * i / itemCount; // keeps end <= 1.0 for any itemCount
   animations[i] = CurvedAnimation(
     parent: controller,
-    curve: Interval(
-      i * 0.1,
-      (i * 0.1) + 0.15,
-      curve: Curves.easeOut,
-    ),
+    curve: Interval(start, start + 0.15, curve: Curves.easeOut),
   );
 }
 
@@ -594,15 +583,18 @@ void main() {
 
 ### Print Interval Ranges
 
+`Tween.animate()` returns an `Animation`, not a `CurvedAnimation`, so casting
+`_animations[i]` to `CurvedAnimation` throws. Keep the intervals in their own list:
+
 ```dart
-for (int i = 0; i < _animations.length; i++) {
-  final anim = _animations[i] as CurvedAnimation;
-  print('Animation $i: ${anim.curve}');
+// In initState: _intervals = [for (int i = 0; i < count; i++) Interval(i * 0.1, i * 0.1 + 0.4, curve: Curves.easeOut)];
+for (int i = 0; i < _intervals.length; i++) {
+  print('Animation $i: ${_intervals[i]}');
 }
 
 // Output:
-// Animation 0: Interval(0.0, 0.4, Curves.easeOut)
-// Animation 1: Interval(0.1, 0.5, Curves.easeOut)
+// Animation 0: Interval(0.0⋯0.4)➩Cubic(0.00, 0.00, 0.58, 1.00)
+// Animation 1: Interval(0.1⋯0.5)➩Cubic(0.00, 0.00, 0.58, 1.00)
 // ...
 ```
 
@@ -712,14 +704,11 @@ final startDelay = (row * 0.2) + (col * 0.05);
 ```dart
 // Use spring physics for staggered elements
 for (int i = 0; i < itemCount; i++) {
+  final start = 0.5 * i / itemCount; // keeps end <= 1.0 for any itemCount
   animations[i] = Tween<double>(begin: 0, end: 1).animate(
     CurvedAnimation(
       parent: controller,
-      curve: Interval(
-        i * 0.05,
-        (i * 0.05) + 0.5,
-        curve: Curves.elasticOut,
-      ),
+      curve: Interval(start, start + 0.5, curve: Curves.elasticOut),
     ),
   );
 }

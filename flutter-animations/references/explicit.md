@@ -340,8 +340,10 @@ Stack(
   children: [
     PositionedTransition(
       rect: RelativeRectTween(
-        begin: RelativeRect.fill(calculateRect(context, startPosition)),
-        end: RelativeRect.fill(calculateRect(context, endPosition)),
+        // RelativeRect.fill is a constant, not a constructor. fromRect takes the
+        // child's rect and the Stack's rect (e.g. Offset.zero & stackSize).
+        begin: RelativeRect.fromRect(calculateRect(context, startPosition), containerRect),
+        end: RelativeRect.fromRect(calculateRect(context, endPosition), containerRect),
       ).animate(_animation),
       child: const FlutterLogo(),
     ),
@@ -442,7 +444,7 @@ _animation.addStatusListener((status) {
 ### Flutter DevTools Performance Overlay
 
 1. Run app in debug mode
-2. Press 'p' to toggle performance overlay
+2. Press `P` (uppercase) in the `flutter run` console to toggle the performance overlay (`p` toggles debug paint)
 3. Look for "GPU UI" and "GPU Raster" graphs
 4. Aim for 60fps (16.67ms per frame)
 
@@ -480,18 +482,24 @@ _animation = CurvedAnimation(
 
 ### Shake Effect
 
-```dart
-class ShakeCurve extends Curve {
-  @override
-  double transform(double t) {
-    return sin(t * pi * 2);
-  }
-}
+Don't express a shake as a `Curve`: a curve must end at 1.0, and
+`sin(t * pi * 2)` ends at 0.0, so `CurvedAnimation` throws
+"Invalid curve endpoint at 1.0" in debug mode. Use the linear controller value
+in the builder instead:
 
-_animation = CurvedAnimation(
-  parent: _controller,
-  curve: ShakeCurve(),
-);
+```dart
+AnimatedBuilder(
+  animation: _controller,
+  builder: (context, child) {
+    return Transform.translate(
+      offset: Offset(sin(_controller.value * pi * 2) * 8, 0),
+      child: child,
+    );
+  },
+  child: const FlutterLogo(),
+)
+
+// Trigger: _controller.forward(from: 0);
 ```
 
 ### Parallax Scrolling

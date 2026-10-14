@@ -125,7 +125,8 @@ class _TweenAnimationBuilderExampleState
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: 1),
+              // TweenAnimationBuilder animates only when the tween's end changes.
+              tween: Tween<double>(begin: 0, end: _animated ? 1 : 0.3),
               duration: const Duration(seconds: 1),
               curve: Curves.easeInOut,
               builder: (context, value, child) {

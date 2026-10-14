@@ -78,16 +78,16 @@ Example: Good for feedback animations
 ### Back (Overshoot)
 
 ```dart
-Curves.backIn
-Curves.backOut
-Curves.backInOut
+Curves.easeInBack
+Curves.easeOutBack
+Curves.easeInOutBack
 ```
 
-**Curves.backIn** - Backs up before going in
+**Curves.easeInBack** - Pulls back below the start before accelerating
 
-**Curves.backOut** - Backs up before coming out
+**Curves.easeOutBack** - Overshoots the end, then settles back
 
-**Curves.backInOut** - Backs up on both ends
+**Curves.easeInOutBack** - Pulls back at the start and overshoots at the end
 
 Example: Good for revealing content
 
@@ -105,7 +105,7 @@ Fast start, very slow end. Similar to easeOut but more dramatic.
 Curves.fastOutSlowIn
 ```
 
-Very fast start, very slow middle, very fast end. Dramatic.
+The standard Material curve, `Cubic(0.4, 0.0, 0.2, 1.0)`: accelerates quickly, then decelerates slowly into the end.
 
 ### Custom Curves in Flutter API
 
@@ -178,7 +178,7 @@ class CustomCurve extends Curve {
   double transform(double t) {
     // t is 0.0 to 1.0
     // Return 0.0 to 1.0
-    return math.pow(t, 2);  // Quadratic ease in
+    return math.pow(t, 2).toDouble();  // Quadratic ease in (pow returns num)
   }
 }
 ```
@@ -193,15 +193,24 @@ AnimatedContainer(
 )
 ```
 
-### Shake Curve
+### Shake (not a Curve)
+
+A curve must map 0.0 to 0.0 and 1.0 to 1.0. `sin(t * pi * 2)` ends at 0.0, so
+`CurvedAnimation` (which implicit animation widgets also use) throws
+"Invalid curve endpoint at 1.0" in debug mode. Drive a shake from a linear
+controller and apply the oscillation in the builder instead:
 
 ```dart
-class ShakeCurve extends Curve {
-  @override
-  double transform(double t) {
-    return sin(t * pi * 2);
-  }
-}
+AnimatedBuilder(
+  animation: _controller, // e.g. 400ms; call _controller.forward(from: 0) to shake
+  builder: (context, child) {
+    return Transform.translate(
+      offset: Offset(sin(_controller.value * pi * 2) * 8, 0),
+      child: child,
+    );
+  },
+  child: const Text('Shake me'),
+)
 ```
 
 ### Smooth Step Curve
@@ -229,7 +238,7 @@ class ExponentialCurve extends Curve {
 
   @override
   double transform(double t) {
-    return math.pow(t, exponent);
+    return math.pow(t, exponent).toDouble();
   }
 }
 ```
@@ -238,33 +247,20 @@ class ExponentialCurve extends Curve {
 
 ### Cubic Bezier
 
-Flutter doesn't have built-in cubic bezier, but you can approximate:
+Flutter has a built-in cubic Bézier curve, `Cubic(a, b, c, d)`, with the same
+control points as CSS `cubic-bezier(a, b, c, d)`. `Curves.ease`,
+`Curves.fastOutSlowIn` and most other standard curves are `Cubic` instances.
 
 ```dart
-class CubicBezier extends Curve {
-  final double p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y;
+// CSS: cubic-bezier(0.68, -0.55, 0.265, 1.55)
+const myCurve = Cubic(0.68, -0.55, 0.265, 1.55);
 
-  const CubicBezier({
-    required this.p0x,
-    required this.p0y,
-    required this.p1x,
-    required this.p1y,
-    required this.p2x,
-    required this.p2y,
-    required this.p3x,
-    required this.p3y,
-  });
-
-  @override
-  double transform(double t) {
-    // Simplified cubic bezier formula
-    final u = 1 - t;
-    return (u * u * u * p0y +
-            3 * u * u * t * p1y +
-            3 * u * t * t * p2y +
-            t * t * t * p3y);
-  }
-}
+AnimatedContainer(
+  curve: myCurve,
+  duration: const Duration(milliseconds: 300),
+  width: _expanded ? 200 : 100,
+  child: const FlutterLogo(),
+)
 ```
 
 ### Combining Curves
@@ -318,7 +314,7 @@ AnimatedContainer(
 | Rotation | easeInOut | Natural angular acceleration |
 | Color change | linear | Uniform color transition |
 | Scale | elasticOut | Playful, bouncy feel |
-| Reveal | backOut | Dramatic reveal effect |
+| Reveal | easeOutBack | Dramatic reveal effect |
 | Loading | linear or ease | Consistent speed |
 | Success | elasticOut | Celebratory feel |
 
@@ -421,7 +417,7 @@ class CurveVisualizer extends StatelessWidget {
 class _CurvePainter extends CustomPainter {
   final Curve curve;
 
-  const CurvePainter({required this.curve});
+  const _CurvePainter({required this.curve});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -544,8 +540,8 @@ _animation = CurvedAnimation(
 | elasticOut | Normal | Fast | Back | Bouncy end |
 | bounceIn | Bounce | Fast | Normal | Bouncy start |
 | bounceOut | Normal | Fast | Bounce | Bouncy end |
-| backIn | Back | Fast | Normal | Overshoot start |
-| backOut | Normal | Fast | Back | Overshoot end |
+| easeInBack | Back | Fast | Normal | Overshoot start |
+| easeOutBack | Normal | Fast | Back | Overshoot end |
 
 ## Best Practices
 

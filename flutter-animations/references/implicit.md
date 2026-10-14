@@ -31,7 +31,7 @@ AnimatedContainer(
 - `color` - Background color
 - `decoration` - BoxDecoration (includes border, shadow, image, etc.)
 - `padding` - Padding
-- `margin` - Margin (via decoration)
+- `margin` - Margin
 - `transform` - Matrix4 transformation
 
 ### AnimatedOpacity
@@ -187,6 +187,7 @@ AnimatedPhysicalModel(
   shape: BoxShape.rectangle,
   elevation: _elevated ? 12 : 0,
   color: _elevated ? Colors.blue : Colors.grey[300]!,
+  shadowColor: Colors.black, // required
   borderRadius: BorderRadius.circular(12),
   child: const Padding(
     padding: EdgeInsets.all(16),
@@ -253,15 +254,37 @@ Curves.bounceOut     // Bounces out (more subtle)
 
 Custom curve:
 ```dart
-class ShakeCurve extends Curve {
+class QuadraticEaseIn extends Curve {
+  const QuadraticEaseIn();
+
   @override
-  double transform(double t) => sin(t * pi * 2);
+  double transformInternal(double t) => t * t;
 }
 
 // Usage
 AnimatedContainer(
-  curve: ShakeCurve(),
-  // ...
+  curve: const QuadraticEaseIn(),
+  duration: const Duration(milliseconds: 300),
+  width: _expanded ? 200 : 100,
+)
+```
+
+A curve must map 0.0 to 0.0 and 1.0 to 1.0. Implicit widgets wrap the curve in a
+`CurvedAnimation`, which throws "Invalid curve endpoint" in debug mode when it does not.
+So an oscillation such as `sin(t * 2 * math.pi)` is not a valid curve. Apply it in a builder:
+
+```dart
+import 'dart:math' as math;
+
+TweenAnimationBuilder<double>(
+  key: ValueKey(_shakeCount), // increment _shakeCount in setState to shake again
+  tween: Tween(begin: 0.0, end: 1.0),
+  duration: const Duration(milliseconds: 400),
+  builder: (context, t, child) => Transform.translate(
+    offset: Offset(math.sin(t * 2 * math.pi) * 8, 0),
+    child: child,
+  ),
+  child: const Text('Shake'),
 )
 ```
 
@@ -297,7 +320,7 @@ AnimatedOpacity(
 ### DON'T
 
 - Use implicit animations for complex, multi-property sequences (use staggered instead)
-- Forget to set duration (defaults to instant change)
+- Use durations so short that the change looks like a jump (`duration` is required; there is no default)
 - Use extremely long durations (> 1s) without good reason
 - Animate too many properties simultaneously (performance impact)
 - Nest implicit animations deeply (can cause jank)
@@ -322,8 +345,10 @@ timeDilation = 10.0;
 ### Show Repaint Rainbows
 
 ```dart
+import 'package:flutter/rendering.dart';
+
 void main() {
-  debugPaintSizeEnabled = true;
+  debugRepaintRainbowEnabled = true; // debugPaintSizeEnabled shows layout bounds instead
   runApp(MyApp());
 }
 ```
@@ -335,7 +360,8 @@ void main() {
   runApp(MyApp());
 }
 
-// In debug mode, press 'p' to toggle performance overlay
+// In the `flutter run` console, press `P` (uppercase) to toggle the performance overlay.
+// Lowercase `p` toggles debug paint (layout bounds).
 ```
 
 ## Comparison: Implicit vs Explicit

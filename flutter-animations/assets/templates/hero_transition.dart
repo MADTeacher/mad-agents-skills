@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 /// - Basic hero animation with matching tags
 /// - Custom PhotoHero widget
 /// - Navigation between screens with hero transition
-/// - MaterialRectCenterArcTween for aspect ratio preservation
 
 void main() => runApp(const HeroAnimationApp());
 
